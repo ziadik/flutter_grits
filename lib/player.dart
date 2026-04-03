@@ -4,6 +4,14 @@ import 'package:flutter/services.dart';
 import 'dart:math' as math;
 import 'dart:async';
 
+export 'package:flutter_grits/models/sprite_data.dart';
+export 'package:flutter_grits/player/player_animator.dart';
+export 'package:flutter_grits/player/player_painter.dart';
+export 'package:flutter_grits/sprites/sprite_sheet.dart';
+export 'package:flutter_grits/painters/tile_layer_painter.dart';
+export 'package:flutter_grits/painters/environment_painter.dart';
+export 'package:flutter_grits/widgets/tile_map_viewer_with_effects.dart';
+
 class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -68,7 +76,7 @@ class _MapLoaderScreenState extends State<MapLoaderScreen> {
       return Scaffold(body: Center(child: Text('Не удалось загрузить ресурсы')));
     }
 
-    return EffectsMapScreen(mapData: _mapData!, effectsJson: _effectsJson!);
+    return EffectsMapScreen(mapData: _mapData!, effectsJson: _effectsJson!, effectsImage: AssetImage('assets/grits_effects.png'));
   }
 }
 
@@ -76,8 +84,9 @@ class _MapLoaderScreenState extends State<MapLoaderScreen> {
 class EffectsMapScreen extends StatefulWidget {
   final Map<String, dynamic> mapData;
   final Map<String, dynamic> effectsJson;
+  final ImageProvider effectsImage;
 
-  const EffectsMapScreen({Key? key, required this.mapData, required this.effectsJson}) : super(key: key);
+  const EffectsMapScreen({Key? key, required this.mapData, required this.effectsJson, required this.effectsImage}) : super(key: key);
 
   @override
   _EffectsMapScreenState createState() => _EffectsMapScreenState();
@@ -88,6 +97,10 @@ class _EffectsMapScreenState extends State<EffectsMapScreen> with TickerProvider
   bool _showLabels = true;
   bool _showDebug = false;
   bool _showPlayer = true;
+  bool _followPlayer = true; // Слежение за игроком
+
+  // Управление камерой
+  late TransformationController _cameraController;
 
   // Управление игроком
   final Set<String> _pressedKeys = {};
@@ -112,6 +125,9 @@ class _EffectsMapScreenState extends State<EffectsMapScreen> with TickerProvider
   void initState() {
     super.initState();
 
+    // Инициализируем контроллер камеры
+    _cameraController = TransformationController();
+
     // Инициализируем аниматор игрока
     _playerAnimator = PlayerAnimator();
     _playerAnimator.loadFromJson(widget.effectsJson);
@@ -123,6 +139,51 @@ class _EffectsMapScreenState extends State<EffectsMapScreen> with TickerProvider
     _loadEffectsImage();
 
     _startInputLoop();
+
+    // Подгоняем карту под размер экрана
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _fitMapToScreen();
+    });
+  }
+
+  /// Подгоняет карту под размер экрана
+  void _fitMapToScreen() {
+    if (!mounted) return;
+
+    final size = MediaQuery.of(context).size;
+
+    // Получаем размеры карты из данных
+    final tileWidth = widget.mapData['tilewidth'] ?? 64;
+    final tileHeight = widget.mapData['tileheight'] ?? 64;
+    final mapWidth = widget.mapData['width'] ?? 64;
+    final mapHeight = widget.mapData['height'] ?? 48;
+
+    // Размер карты в пикселях
+    final mapPixelWidth = mapWidth * tileWidth.toDouble();
+    final mapPixelHeight = mapHeight * tileHeight.toDouble();
+
+    // Вычисляем масштаб, чтобы карта помещалась в экран
+    // Учитываем отступы (10% от размера экрана)
+    final padding = 0.1;
+    final availableWidth = size.width * (1 - padding);
+    final availableHeight = size.height * (1 - padding);
+
+    final scaleX = availableWidth / mapPixelWidth;
+    final scaleY = availableHeight / mapPixelHeight;
+
+    // Берём минимальный масштаб, чтобы карта влезла полностью
+    final scale = scaleX < scaleY ? scaleX : scaleY;
+
+    // Ограничиваем масштаб разумными пределами
+    final clampedScale = scale.clamp(0.1, 5.0);
+
+    // Центрируем карту
+    final offsetX = (size.width - mapPixelWidth * clampedScale) / 2;
+    final offsetY = (size.height - mapPixelHeight * clampedScale) / 2;
+
+    _cameraController.value = Matrix4.identity()
+      ..translate(offsetX, offsetY)
+      ..scale(clampedScale);
   }
 
   Future<void> _loadEffectsImage() async {
@@ -180,11 +241,64 @@ class _EffectsMapScreenState extends State<EffectsMapScreen> with TickerProvider
           _playerAngle = math.atan2(dy, dx);
         }
       });
+
+      // Слежение за игроком
+      if (_followPlayer) {
+        _updateCameraPosition();
+      }
     } else {
       setState(() {
         _playerWalking = false;
       });
     }
+  }
+
+  /// Обновляет позицию камеры для слежения за игроком
+  void _updateCameraPosition() {
+    if (!_followPlayer || !mounted) return;
+
+    final size = MediaQuery.of(context).size;
+
+    // Получаем текущую матрицу трансформации
+    final matrix = _cameraController.value;
+    final scale = matrix.getMaxScaleOnAxis();
+
+    // Вычисляем размер видимой области в пикселях карты
+    final visibleWidth = size.width / scale;
+    final visibleHeight = size.height / scale;
+
+    // Целевая позиция игрока (центр экрана)
+    final targetX = _playerX * scale - visibleWidth / 2 + 64 * scale;
+    final targetY = _playerY * scale - visibleHeight / 2 + 64 * scale;
+
+    // Получаем текущее смещение
+    final currentTranslation = matrix.getTranslation();
+    final currentX = -currentTranslation.x;
+    final currentY = -currentTranslation.y;
+
+    // Плавная интерполяция (lerp)
+    const lerpFactor = 0.1;
+    final newX = currentX + (targetX - currentX) * lerpFactor;
+    final newY = currentY + (targetY - currentY) * lerpFactor;
+
+    // Применяем трансформацию
+    _cameraController.value = Matrix4.identity()
+      ..translate(newX, newY)
+      ..scale(scale);
+  }
+
+  /// Центрирует камеру на игроке (одноразово)
+  void _centerCameraOnPlayer() {
+    final size = MediaQuery.of(context).size;
+    final scale = _cameraController.value.getMaxScaleOnAxis();
+
+    // Центрируем игрока на экране
+    final x = _playerX * scale - size.width / 2 + 64 * scale;
+    final y = _playerY * scale - size.height / 2 + 64 * scale;
+
+    _cameraController.value = Matrix4.identity()
+      ..translate(-x / scale, -y / scale)
+      ..scale(scale);
   }
 
   @override
@@ -218,12 +332,24 @@ class _EffectsMapScreenState extends State<EffectsMapScreen> with TickerProvider
         appBar: AppBar(
           title: Text('Карта с эффектами'),
           actions: [
+            IconButton(icon: const Icon(Icons.fit_screen), onPressed: () => _fitMapToScreen(), tooltip: 'Вписать карту в экран'),
+            IconButton(
+              icon: Icon(_followPlayer ? Icons.gps_fixed : Icons.gps_not_fixed),
+              onPressed: () => setState(() {
+                _followPlayer = !_followPlayer;
+                if (_followPlayer) {
+                  _centerCameraOnPlayer();
+                }
+              }),
+              tooltip: _followPlayer ? 'Отключить слежение' : 'Слежение за игроком',
+            ),
             IconButton(icon: Icon(_showEffects ? Icons.visibility : Icons.visibility_off), onPressed: () => setState(() => _showEffects = !_showEffects), tooltip: 'Эффекты'),
             IconButton(icon: Icon(_showPlayer ? Icons.person : Icons.person_off), onPressed: () => setState(() => _showPlayer = !_showPlayer), tooltip: 'Игрок'),
             IconButton(icon: Icon(_showLabels ? Icons.label : Icons.label_off), onPressed: () => setState(() => _showLabels = !_showLabels), tooltip: 'Подписи'),
           ],
         ),
         body: InteractiveViewer(
+          transformationController: _cameraController,
           minScale: 0.1,
           maxScale: 5.0,
           boundaryMargin: EdgeInsets.all(100),
@@ -241,7 +367,7 @@ class _EffectsMapScreenState extends State<EffectsMapScreen> with TickerProvider
               ),
 
               // Игрок
-              if (_showPlayer)
+              if (_showPlayer && _effectsImageInfo != null)
                 AnimatedBuilder(
                   animation: _animationController,
                   builder: (context, child) {
@@ -251,7 +377,7 @@ class _EffectsMapScreenState extends State<EffectsMapScreen> with TickerProvider
                       child: CustomPaint(
                         painter: PlayerPainter(
                           animator: _playerAnimator,
-                          effectsImage: widget.effectsImage,
+                          effectsImageInfo: _effectsImageInfo!,
                           direction: _playerDirection,
                           walking: _playerWalking,
                           animationValue: _animationController.value,
@@ -289,6 +415,152 @@ class _EffectsMapScreenState extends State<EffectsMapScreen> with TickerProvider
         ),
       ),
     );
+  }
+}
+
+// Класс для управления камерой с плавной навигацией
+class CameraController {
+  final TickerProviderStateMixin vsync;
+  late AnimationController _animationController;
+  late TransformationController _transformationController;
+
+  // Позиция камеры (в тайлах)
+  double _cameraX = 0.0;
+  double _cameraY = 0.0;
+
+  // Целевая позиция (для плавной навигации)
+  double _targetX = 0.0;
+  double _targetY = 0.0;
+
+  // Параметры камеры
+  double _zoom = 1.0;
+  final double _minZoom = 0.1;
+  final double _maxZoom = 5.0;
+  final double _lerpFactor = 0.1; // Коэффициент интерполяции (чем меньше, тем плавнее)
+
+  // Размер карты
+  int _mapWidth = 64;
+  int _mapHeight = 48;
+
+  // Размер тайла
+  double _tileWidth = 64.0;
+  double _tileHeight = 64.0;
+
+  // Ограничения камеры
+  bool _enableBounds = true;
+
+  CameraController({required this.vsync, int mapWidth = 64, int mapHeight = 48, double tileWidth = 64.0, double tileHeight = 64.0, double initialZoom = 1.0, bool enableBounds = true})
+    : _mapWidth = mapWidth,
+      _mapHeight = mapHeight,
+      _tileWidth = tileWidth,
+      _tileHeight = tileHeight,
+      _zoom = initialZoom,
+      _enableBounds = enableBounds {
+    _animationController =
+        AnimationController(vsync: vsync, duration: Duration(milliseconds: 16)) // ~60 FPS
+          ..addListener(_updateCamera);
+
+    _transformationController = TransformationController();
+  }
+
+  // Получаем текущую позицию камеры
+  Offset get cameraPosition {
+    return Offset(_cameraX, _cameraY);
+  }
+
+  // Получаем целевую позицию
+  Offset get targetPosition {
+    return Offset(_targetX, _targetY);
+  }
+
+  // Получаем текущий масштаб
+  double get zoom => _zoom;
+
+  // Устанавливаем целевую позицию (центрируем камеру на точку)
+  void followTarget(double targetX, double targetY) {
+    _targetX = targetX;
+    _targetY = targetY;
+
+    // Ограничиваем цель в пределах карты
+    if (_enableBounds) {
+      _targetX = _targetX.clamp(0, _mapWidth * _tileWidth - _tileWidth);
+      _targetY = _targetY.clamp(0, _mapHeight * _tileHeight - _tileHeight);
+    }
+  }
+
+  // Устанавливаем позицию камеры (с мгновенным перемещением)
+  void setPosition(double x, double y) {
+    _cameraX = x;
+    _targetX = x;
+    _cameraY = y;
+    _targetY = y;
+  }
+
+  // Устанавливаем масштаб
+  void setZoom(double newZoom) {
+    _zoom = newZoom.clamp(_minZoom, _maxZoom);
+  }
+
+  // Сбрасывает камеру в исходное положение
+  void reset() {
+    setPosition(0, 0);
+    setZoom(1.0);
+  }
+
+  // Обновление позиции камеры (интерполяция)
+  void _updateCamera() {
+    // Плавное перемещение к цели
+    _cameraX = _cameraX + (_targetX - _cameraX) * _lerpFactor;
+    _cameraY = _cameraY + (_targetY - _cameraY) * _lerpFactor;
+
+    // Применяем трансформацию
+    final transform = Matrix4.identity()
+      ..translate(_cameraX, _cameraY)
+      ..scale(_zoom);
+
+    _transformationController.value = transform;
+  }
+
+  // Получаем TransformationController
+  TransformationController get transformationController => _transformationController;
+
+  // Обновляем размеры карты
+  void updateMapSize(int mapWidth, int mapHeight, double tileWidth, double tileHeight) {
+    _mapWidth = mapWidth;
+    _mapHeight = mapHeight;
+    _tileWidth = tileWidth;
+    _tileHeight = tileHeight;
+
+    // Проверяем, не вышла ли камера за границы
+    if (_enableBounds) {
+      final maxX = _mapWidth * _tileWidth - _tileWidth;
+      final maxY = _mapHeight * _tileHeight - _tileHeight;
+      _cameraX = _cameraX.clamp(0, maxX);
+      _cameraY = _cameraY.clamp(0, maxY);
+      _targetX = _targetX.clamp(0, maxX);
+      _targetY = _targetY.clamp(0, maxY);
+    }
+  }
+
+  // Управление камерой (перемещение)
+  void moveCamera(double dx, double dy) {
+    if (_enableBounds) {
+      _targetX = (_targetX - dx).clamp(0, _mapWidth * _tileWidth - _tileWidth);
+      _targetY = (_targetY - dy).clamp(0, _mapHeight * _tileHeight - _tileHeight);
+    } else {
+      _targetX -= dx;
+      _targetY -= dy;
+    }
+  }
+
+  // Управление камерой (зум)
+  void zoomCamera(double factor) {
+    setZoom(_zoom * factor);
+  }
+
+  void dispose() {
+    _animationController.dispose();
+    _transformationController.dispose();
   }
 }
 
@@ -384,12 +656,16 @@ class PlayerAnimator {
     final frameIndex = (animationValue * frames.length).floor() % frames.length;
     return frames[frameIndex];
   }
+
+  SpriteData? getTurretSprite() {
+    return _sprites['turret_player_color.png'];
+  }
 }
 
 // Painter для игрока с анимацией
 class PlayerPainter extends CustomPainter {
   final PlayerAnimator animator;
-  final ImageProvider effectsImage;
+  final ImageInfo effectsImageInfo;
   final int direction;
   final bool walking;
   final double animationValue;
@@ -404,7 +680,7 @@ class PlayerPainter extends CustomPainter {
 
   PlayerPainter({
     required this.animator,
-    required this.effectsImage,
+    required this.effectsImageInfo,
     required this.direction,
     required this.walking,
     required this.animationValue,
@@ -444,6 +720,9 @@ class PlayerPainter extends CustomPainter {
 
     final legMaskSprite = walking ? animator.getLegMaskSprite(directionName, animationValue) : animator.getLegMaskSprite(directionName, 0);
 
+    // Получаем спрайт turret
+    final turretSprite = animator.getTurretSprite();
+
     // Сохраняем состояние канваса
     canvas.save();
 
@@ -469,7 +748,7 @@ class PlayerPainter extends CustomPainter {
     _drawTeamMask(canvas, size);
 
     // Рисуем пушку
-    _drawTurret(canvas, size);
+    _drawTurret(canvas, size, turretSprite);
 
     // Восстанавливаем состояние канваса
     canvas.restore();
@@ -484,43 +763,37 @@ class PlayerPainter extends CustomPainter {
   }
 
   void _drawLegMask(Canvas canvas, SpriteData sprite) {
-    // В реальном приложении здесь будет отрисовка спрайта маски
-    // Для демонстрации рисуем цветную область
-
-    final maskPaint = Paint()
+    // Рисуем спрайт маски ног
+    final paint = Paint()
+      ..filterQuality = FilterQuality.none
+      ..isAntiAlias = false
       ..color = _getTeamColor().withOpacity(0.6)
-      ..style = PaintingStyle.fill;
+      ..blendMode = BlendMode.multiply;
 
-    canvas.drawRect(Rect.fromCenter(center: Offset.zero, width: sprite.frame.width, height: sprite.frame.height), maskPaint);
+    final srcRect = sprite.frame;
+    // Масштабируем спрайт под размер игрока
+    final scale = 2.0;
+    final dstWidth = srcRect.width * scale;
+    final dstHeight = srcRect.height * scale;
+    final dstRect = Rect.fromCenter(center: Offset.zero, width: dstWidth, height: dstHeight);
+
+    canvas.drawImageRect(effectsImageInfo.image, srcRect, dstRect, paint);
   }
 
   void _drawLegs(Canvas canvas, SpriteData sprite) {
-    // В реальном приложении здесь будет отрисовка спрайта ног
-    // Для демонстрации рисуем простую форму
+    // Рисуем спрайт ног
+    final paint = Paint()
+      ..filterQuality = FilterQuality.none
+      ..isAntiAlias = false;
 
-    final legPaint = Paint()
-      ..color = Colors.white.withOpacity(0.8)
-      ..style = PaintingStyle.fill;
+    final srcRect = sprite.frame;
+    // Масштабируем спрайт под размер игрока
+    final scale = 2.0;
+    final dstWidth = srcRect.width * scale;
+    final dstHeight = srcRect.height * scale;
+    final dstRect = Rect.fromCenter(center: Offset.zero, width: dstWidth, height: dstHeight);
 
-    // Рисуем ноги в зависимости от направления
-    switch (direction) {
-      case 0: // up
-        canvas.drawOval(Rect.fromCircle(center: Offset(-15, 20), radius: 10), legPaint);
-        canvas.drawOval(Rect.fromCircle(center: Offset(15, 20), radius: 10), legPaint);
-        break;
-      case 1: // left
-        canvas.drawOval(Rect.fromCircle(center: Offset(-20, 15), radius: 10), legPaint);
-        canvas.drawOval(Rect.fromCircle(center: Offset(-20, -15), radius: 10), legPaint);
-        break;
-      case 2: // down
-        canvas.drawOval(Rect.fromCircle(center: Offset(-15, -20), radius: 10), legPaint);
-        canvas.drawOval(Rect.fromCircle(center: Offset(15, -20), radius: 10), legPaint);
-        break;
-      case 3: // right
-        canvas.drawOval(Rect.fromCircle(center: Offset(20, 15), radius: 10), legPaint);
-        canvas.drawOval(Rect.fromCircle(center: Offset(20, -15), radius: 10), legPaint);
-        break;
-    }
+    canvas.drawImageRect(effectsImageInfo.image, srcRect, dstRect, paint);
   }
 
   void _drawDefaultLegs(Canvas canvas) {
@@ -569,27 +842,42 @@ class PlayerPainter extends CustomPainter {
     canvas.drawCircle(Offset.zero, 22, maskPaint);
   }
 
-  void _drawTurret(Canvas canvas, Size size) {
+  void _drawTurret(Canvas canvas, Size size, SpriteData? turretSprite) {
     canvas.save();
     canvas.rotate(angle + math.pi); // +180 градусов как в оригинале
 
-    // Башня
-    final turretPaint = Paint()
-      ..color = Colors.grey[700]!
-      ..style = PaintingStyle.fill;
+    if (turretSprite != null) {
+      // Рисуем спрайт turret
+      final paint = Paint()
+        ..filterQuality = FilterQuality.none
+        ..isAntiAlias = false;
 
-    final turretRect = Rect.fromCenter(center: Offset(0, 0), width: 40, height: 15);
+      final srcRect = turretSprite.frame;
+      final scale = 2.0;
+      final dstWidth = srcRect.width * scale;
+      final dstHeight = srcRect.height * scale;
+      final dstRect = Rect.fromCenter(center: Offset.zero, width: dstWidth, height: dstHeight);
 
-    canvas.drawRect(turretRect, turretPaint);
+      canvas.drawImageRect(effectsImageInfo.image, srcRect, dstRect, paint);
+    } else {
+      // Башня
+      final turretPaint = Paint()
+        ..color = Colors.grey[700]!
+        ..style = PaintingStyle.fill;
 
-    // Дуло
-    final barrelPaint = Paint()
-      ..color = Colors.grey[900]!
-      ..style = PaintingStyle.fill;
+      final turretRect = Rect.fromCenter(center: Offset(0, 0), width: 40, height: 15);
 
-    final barrelRect = Rect.fromCenter(center: Offset(30, 0), width: 20, height: 8);
+      canvas.drawRect(turretRect, turretPaint);
 
-    canvas.drawRect(barrelRect, barrelPaint);
+      // Дуло
+      final barrelPaint = Paint()
+        ..color = Colors.grey[900]!
+        ..style = PaintingStyle.fill;
+
+      final barrelRect = Rect.fromCenter(center: Offset(30, 0), width: 20, height: 8);
+
+      canvas.drawRect(barrelRect, barrelPaint);
+    }
 
     canvas.restore();
   }
@@ -1024,20 +1312,30 @@ class EnvironmentPainter extends CustomPainter {
   }
 
   void _drawLabel(Canvas canvas, String name, double x, double y, double width) {
-    final text = name.length > 15 ? '${name.substring(0, 15)}...' : name;
-    final span = TextSpan(
-      text: text,
-      style: TextStyle(
-        fontSize: 10,
-        color: Colors.white,
-        fontWeight: FontWeight.bold,
-        shadows: [Shadow(color: Colors.black, offset: Offset(1, 1), blurRadius: 2)],
-      ),
+    final textStyle = TextStyle(
+      fontSize: 10,
+      color: Colors.white,
+      shadows: [Shadow(color: Colors.black, offset: Offset(1, 1), blurRadius: 2)],
     );
 
-    final tp = TextPainter(text: span, textAlign: TextAlign.center, textDirection: TextDirection.ltr)..layout();
+    final tp = TextPainter(
+      text: TextSpan(text: name, style: textStyle),
+      textDirection: TextDirection.ltr,
+    )..layout();
 
-    tp.paint(canvas, Offset(x + width / 2 - tp.width / 2, y - tp.height - 2));
+    final shadowTp = TextPainter(
+      text: TextSpan(text: name, style: textStyle),
+      textDirection: TextDirection.ltr,
+    )..layout();
+
+    final xPos = x + width / 2 - tp.width / 2;
+    final yPos = y - tp.height - 2;
+
+    // Тень
+    shadowTp.paint(canvas, Offset(xPos + 1, yPos + 1));
+
+    // Основной текст
+    tp.paint(canvas, Offset(xPos, yPos));
   }
 
   void _drawDebugInfo(Canvas canvas, dynamic obj, double x, double y, double width, double height) {
