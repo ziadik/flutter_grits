@@ -1,6 +1,6 @@
 name: flutter_grits
 description: "A new Flutter project."
-publish_to: 'none'
+publish_to: "none"
 version: 0.1.0
 
 environment:
@@ -18,7 +18,9 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
+    - assets/
+    - assets/maps/
     - assets/grits_master.png
     - assets/grits_effects.png
+    - assets/maps/small_map1.json
     - assets/grits_effects.json
-    - assets/maps/

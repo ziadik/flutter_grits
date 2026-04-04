@@ -1,10 +1,8 @@
 import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_grits/screens/effects_map_screen.dart';
 
-/// Экран загрузки с асинхронной загрузкой ресурсов
 class MapLoaderScreen extends StatefulWidget {
   const MapLoaderScreen({super.key});
 
@@ -16,6 +14,7 @@ class _MapLoaderScreenState extends State<MapLoaderScreen> {
   Map<String, dynamic>? _mapData;
   Map<String, dynamic>? _effectsJson;
   bool _isLoading = true;
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -25,22 +24,39 @@ class _MapLoaderScreenState extends State<MapLoaderScreen> {
 
   Future<void> _loadResources() async {
     try {
+      debugPrint('Начинаем загрузку ресурсов...');
+
       // Загружаем карту
-      final mapJson = await rootBundle.loadString('assets/maps/small_map1.json');
-      final mapData = jsonDecode(mapJson);
+      final mapJsonString = await rootBundle.loadString(
+        'assets/maps/small_map1.json',
+      );
+      debugPrint('Карта загружена, длина: ${mapJsonString.length}');
+      final mapData = jsonDecode(mapJsonString);
 
       // Загружаем эффекты
-      final effectsJson = await rootBundle.loadString('assets/grits_effects.json');
-      final effectsData = jsonDecode(effectsJson);
+      final effectsJsonString = await rootBundle.loadString(
+        'assets/grits_effects.json',
+      );
+      debugPrint('Эффекты загружены, длина: ${effectsJsonString.length}');
+      final effectsData = jsonDecode(effectsJsonString);
 
-      setState(() {
-        _mapData = mapData;
-        _effectsJson = effectsData;
-        _isLoading = false;
-      });
-    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _mapData = mapData;
+          _effectsJson = effectsData;
+          _isLoading = false;
+        });
+        debugPrint('Ресурсы успешно загружены');
+      }
+    } catch (e, stackTrace) {
       debugPrint('Ошибка загрузки: $e');
-      setState(() => _isLoading = false);
+      debugPrint('Stack trace: $stackTrace');
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString();
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -55,6 +71,30 @@ class _MapLoaderScreenState extends State<MapLoaderScreen> {
               CircularProgressIndicator(),
               SizedBox(height: 20),
               Text('Загрузка карты...'),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_errorMessage != null) {
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error, size: 64, color: Colors.red),
+              const SizedBox(height: 20),
+              const Text('Ошибка загрузки ресурсов:'),
+              const SizedBox(height: 10),
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text(
+                  _errorMessage!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.red),
+                ),
+              ),
             ],
           ),
         ),

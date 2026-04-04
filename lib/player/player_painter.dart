@@ -1,11 +1,13 @@
 import 'dart:ui';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_grits/models/sprite_data.dart';
+import 'package:flutter_grits/player/player_animator.dart';
 
 /// Painter для отрисовки игрока с анимацией
 class PlayerPainter extends CustomPainter {
-  final dynamic animator;
+  final PlayerAnimator animator;
   final ImageInfo effectsImageInfo;
   final int direction;
   final bool walking;
@@ -19,9 +21,9 @@ class PlayerPainter extends CustomPainter {
   final double maxEnergy;
   final bool isLocalPlayer;
 
-  static const double _spriteScale = 2.0;
+  static const double _spriteScale = 1.0; // Уменьшено с 2.0 до 1.0
 
-  PlayerPainter({
+  const PlayerPainter({
     required this.animator,
     required this.effectsImageInfo,
     required this.direction,
@@ -41,10 +43,17 @@ class PlayerPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final directionName = _getDirectionName();
 
-    // Получаем текущий кадр анимации
-    final legSprite = walking ? animator.getLegSprite(directionName, animationValue) : animator.getLegSprite(directionName, 0);
+    // Приводим animationValue к double и убеждаемся что оно в диапазоне [0, 1]
+    final animValue = animationValue.clamp(0.0, 1.0);
 
-    final legMaskSprite = walking ? animator.getLegMaskSprite(directionName, animationValue) : animator.getLegMaskSprite(directionName, 0);
+    // Получаем текущий кадр анимации
+    final legSprite = walking
+        ? animator.getLegSprite(directionName, animValue)
+        : animator.getLegSprite(directionName, 0.0);
+
+    final legMaskSprite = walking
+        ? animator.getLegMaskSprite(directionName, animValue)
+        : animator.getLegMaskSprite(directionName, 0.0);
 
     final turretSprite = animator.getTurretSprite();
 
@@ -120,7 +129,11 @@ class PlayerPainter extends CustomPainter {
     final srcRect = sprite.frame;
     final dstWidth = srcRect.width * _spriteScale;
     final dstHeight = srcRect.height * _spriteScale;
-    final dstRect = Rect.fromCenter(center: Offset.zero, width: dstWidth, height: dstHeight);
+    final dstRect = Rect.fromCenter(
+      center: Offset.zero,
+      width: dstWidth,
+      height: dstHeight,
+    );
 
     canvas.drawImageRect(effectsImageInfo.image, srcRect, dstRect, paint);
   }
@@ -130,8 +143,15 @@ class PlayerPainter extends CustomPainter {
       ..color = Colors.white.withOpacity(0.8)
       ..style = PaintingStyle.fill;
 
-    canvas.drawOval(Rect.fromCircle(center: const Offset(-15, 0), radius: 12), legPaint);
-    canvas.drawOval(Rect.fromCircle(center: const Offset(15, 0), radius: 12), legPaint);
+    // Уменьшено с 15 до 8, радиус с 12 до 6
+    canvas.drawOval(
+      Rect.fromCircle(center: const Offset(-8, 0), radius: 6),
+      legPaint,
+    );
+    canvas.drawOval(
+      Rect.fromCircle(center: const Offset(8, 0), radius: 6),
+      legPaint,
+    );
   }
 
   void _drawTorso(Canvas canvas) {
@@ -139,14 +159,15 @@ class PlayerPainter extends CustomPainter {
       ..color = Colors.grey[800]!
       ..style = PaintingStyle.fill;
 
-    canvas.drawCircle(Offset.zero, 25, torsoPaint);
+    // Уменьшено с 25 до 12
+    canvas.drawCircle(Offset.zero, 12, torsoPaint);
 
     final borderPaint = Paint()
       ..color = Colors.grey[900]!
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2;
+      ..strokeWidth = 1; // Уменьшено с 2 до 1
 
-    canvas.drawCircle(Offset.zero, 25, borderPaint);
+    canvas.drawCircle(Offset.zero, 12, borderPaint);
   }
 
   Color _getTeamColor() {
@@ -163,12 +184,13 @@ class PlayerPainter extends CustomPainter {
       ..style = PaintingStyle.fill
       ..blendMode = BlendMode.multiply;
 
-    canvas.drawCircle(Offset.zero, 22, maskPaint);
+    // Уменьшено с 22 до 10
+    canvas.drawCircle(Offset.zero, 10, maskPaint);
   }
 
   void _drawTurret(Canvas canvas, SpriteData? turretSprite) {
     canvas.save();
-    canvas.rotate(angle + 3.14159265359); // +180 градусов
+    canvas.rotate(angle + math.pi); // +180 градусов
 
     if (turretSprite != null) {
       final paint = Paint()
@@ -177,49 +199,61 @@ class PlayerPainter extends CustomPainter {
 
       _drawSprite(canvas, turretSprite, paint);
     } else {
-      // Башня
       final turretPaint = Paint()
         ..color = Colors.grey[700]!
         ..style = PaintingStyle.fill;
 
-      canvas.drawRect(Rect.fromCenter(center: Offset.zero, width: 40, height: 15), turretPaint);
+      // Уменьшено с 40x15 до 20x8
+      canvas.drawRect(
+        Rect.fromCenter(center: Offset.zero, width: 20, height: 8),
+        turretPaint,
+      );
 
-      // Дуло
       final barrelPaint = Paint()
         ..color = Colors.grey[900]!
         ..style = PaintingStyle.fill;
 
-      canvas.drawRect(Rect.fromCenter(center: const Offset(30, 0), width: 20, height: 8), barrelPaint);
+      // Уменьшено с 20x8 до 10x4
+      canvas.drawRect(
+        Rect.fromCenter(center: const Offset(10, 0), width: 10, height: 4),
+        barrelPaint,
+      );
     }
 
     canvas.restore();
   }
 
   void _drawHealthBar(Canvas canvas, Size size) {
-    final healthPercent = health / maxHealth;
+    final healthPercent = (health / maxHealth).clamp(0.0, 1.0);
     final healthColor = healthPercent >= 0.66
         ? Colors.green
         : healthPercent >= 0.33
         ? Colors.orange
         : Colors.red;
 
-    _drawBar(canvas, size, healthPercent, healthColor, -40);
+    _drawBar(canvas, size, healthPercent, healthColor, -20);
   }
 
   void _drawEnergyBar(Canvas canvas, Size size) {
-    final energyPercent = energy / maxEnergy;
+    final energyPercent = (energy / maxEnergy).clamp(0.0, 1.0);
     final energyColor = energyPercent >= 0.66
         ? Colors.lightBlue
         : energyPercent >= 0.33
         ? Colors.blue
         : Colors.blue[900]!;
 
-    _drawBar(canvas, size, energyPercent, energyColor, -30);
+    _drawBar(canvas, size, energyPercent, energyColor, -14);
   }
 
-  void _drawBar(Canvas canvas, Size size, double percent, Color color, double yOffset) {
-    const barWidth = 60.0;
-    const barHeight = 10.0;
+  void _drawBar(
+    Canvas canvas,
+    Size size,
+    double percent,
+    Color color,
+    double yOffset,
+  ) {
+    const barWidth = 30.0; // Уменьшено с 60 до 30
+    const barHeight = 5.0; // Уменьшено с 10 до 5
     final x = -barWidth / 2;
     final y = -size.height / 2 + yOffset;
 
@@ -235,24 +269,35 @@ class PlayerPainter extends CustomPainter {
       ..color = color
       ..style = PaintingStyle.fill;
 
-    canvas.drawRect(Rect.fromLTWH(x, y, barWidth * percent, barHeight), barPaint);
+    canvas.drawRect(
+      Rect.fromLTWH(x, y, barWidth * percent, barHeight),
+      barPaint,
+    );
 
     // Рамка
     final borderPaint = Paint()
       ..color = Colors.black
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2;
+      ..strokeWidth = 1; // Уменьшено с 2 до 1
 
     canvas.drawRect(Rect.fromLTWH(x, y, barWidth, barHeight), borderPaint);
   }
 
   void _drawNameTag(Canvas canvas, Size size) {
-    final textStyle = TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.green);
+    const textStyle = TextStyle(
+      fontSize: 10, // Уменьшено с 18 до 10
+      fontWeight: FontWeight.bold,
+      color: Colors.green,
+    );
 
-    final shadowStyle = TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black);
+    const shadowStyle = TextStyle(
+      fontSize: 10, // Уменьшено с 18 до 10
+      fontWeight: FontWeight.bold,
+      color: Colors.black,
+    );
 
-    final x = -50.0;
-    final y = -size.height / 2 - 40;
+    final x = -25.0; // Уменьшено с -50 до -25
+    final y = -size.height / 2 - 20;
 
     final textPainter = TextPainter(
       text: TextSpan(text: name, style: textStyle),

@@ -28,38 +28,53 @@
 
 ## Архитектура
 
-Проект организован в одном основном файле с разделением ответственности:
+Проект организован с модульной структурой:
 
 ```
 lib/
-├── main.dart                    # Точка входа (импортирует player.dart)
-└── player.dart                  # Основной код: приложение, игрок, просмотрщик
+├── main.dart                    # Точка входа приложения
+├── player.dart                  # Реэкспорт (возможно для обратной совместимости)
+├── models/
+│   └── sprite_data.dart         # Модели данных для спрайтов
+├── painters/
+│   ├── environment_painter.dart # Отрисовка объектов environment
+│   └── tile_layer_painter.dart  # Отрисовка слоёв тайлов карты
+├── player/
+│   ├── player_animator.dart     # Загрузка и управление анимацией персонажа
+│   └── player_painter.dart      # CustomPainter для отрисовки игрока
+├── screens/
+│   ├── effects_map_screen.dart  # Основной игровой экран
+│   └── map_loader_screen.dart   # Экран загрузки с асинхронной загрузкой ресурсов
+├── sprites/
+│   └── sprite_sheet.dart        # Утилита для работы со спрайтами из TexturePacker JSON
+└── widgets/
+    ├── game_player_widget.dart       # Виджет для отображения игрока
+    └── tile_map_viewer_with_effects.dart # Виджет для отображения карты с эффектами
 ```
 
-**Основные компоненты:**
+### Основные компоненты
 
-1. **MyApp** (player.dart) — корневой виджет приложения с MaterialApp
+1. **MyApp** (main.dart) — корневой виджет приложения с MaterialApp
 
-2. **MapLoaderScreen** (player.dart) — экран загрузки с асинхронной загрузкой ресурсов (карты и JSON эффектов)
+2. **MapLoaderScreen** (screens/map_loader_screen.dart) — экран загрузки с асинхронной загрузкой ресурсов (карты и JSON эффектов)
 
-3. **EffectsMapScreen** (player.dart) — основной игровой экран с:
+3. **EffectsMapScreen** (screens/effects_map_screen.dart) — основной игровой экран с:
    - Управлением персонажем (WASD/стрелки)
    - Слежением камеры за игроком
    - Панелью инструментов (вкл/выкл эффектов, игрока, подписей, слежения)
+   - Кнопкой сброса позиции игрока
 
-4. **TileMapViewerWithEffects** (player.dart) — виджет для отображения тайловой карты с объектами environment
+4. **TileMapViewerWithEffects** (widgets/tile_map_viewer_with_effects.dart) — виджет для отображения тайловой карты с объектами environment
 
-5. **PlayerAnimator** (player.dart) — загрузка и управление анимацией персонажа из TexturePacker JSON (30 кадров на направление: up, down, left, right)
+5. **PlayerAnimator** (player/player_animator.dart) — загрузка и управление анимацией персонажа из TexturePacker JSON (30 кадров на направление: up, down, left, right)
 
-6. **PlayerPainter** (player.dart) — CustomPainter для отрисовки игрока со спрайтами ног, туловища и turret
+6. **PlayerPainter** (player/player_painter.dart) — CustomPainter для отрисовки игрока со спрайтами ног, туловища и turret
 
-7. **SpriteSheet** (player.dart) — утилита для работы со спрайтами из TexturePacker JSON
+7. **SpriteSheet** (sprites/sprite_sheet.dart) — утилита для работы со спрайтами из TexturePacker JSON
 
-8. **EnvironmentPainter** (player.dart) — отрисовка объектов карты (Spawner'ы для QuadDamage, Energy, Health)
+8. **EnvironmentPainter** (painters/environment_painter.dart) — отрисовка объектов карты (Spawner'ы для QuadDamage, Energy, Health)
 
-9. **TileLayerPainter** (player.dart) — отрисовка слоёв тайлов карты
-
-10. **CameraController** (player.dart) — класс для управления камерой с плавной навигацией (пока не используется напрямую, логика слежения в EffectsMapScreen)
+9. **TileLayerPainter** (painters/tile_layer_painter.dart) — отрисовка слоёв тайлов карты
 
 ---
 
@@ -365,19 +380,33 @@ void _updateCameraPosition() {
 
 ## Ассеты проекта
 
+Текущее содержимое директории assets:
+
 ```
 assets/
-├── grits_master.png             # Основной tileset карты
-├── grits_effects.png            # Спрайты эффектов и игрока
 ├── grits_effects.json           # Описание спрайт-листа (TexturePacker)
 └── maps/
     ├── map1.json                # Карта 1 (Tiled формат)
     └── small_map1.json          # Маленькая карта для тестирования
 ```
 
+### ВНИМАНИЕ: Отсутствующие ассеты
+
+В коде есть ссылки на следующие ассеты, которые **отсутствуют** в директории `assets/`:
+
+- `assets/grits_master.png` — Основной tileset карты (используется в TileMapViewerWithEffects)
+- `assets/grits_effects.png` — Спрайты эффектов и игрока (используется в EffectsMapScreen и TileMapViewerWithEffects)
+
+Эти файлы должны быть добавлены в директорию `assets/` для корректной работы приложения. Также необходимо убедиться, что они объявлены в `pubspec.yaml`.
+
 ---
 
 ## Известные проблемы и TODO
+
+### Критические проблемы
+
+- [ ] **Отсутствуют ассеты**: Файлы `grits_master.png` и `grits_effects.png` не найдены в директории assets, что приведёт к ошибкам при запуске
+- [ ] Необходимо добавить недостающие ассеты и обновить pubspec.yaml
 
 ### TODO
 
@@ -386,7 +415,6 @@ assets/
 - [ ] Добавить экспорт карты в изображение
 - [ ] Улучшить коллизии для игрока
 - [ ] Добавить звуковые эффекты
-- [ ] Интегрировать CameraController в EffectsMapScreen
 - [ ] Добавить больше анимаций персонажа (стрельба, смерть и т.д.)
 
 ### Известные ограничения

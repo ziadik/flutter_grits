@@ -18,7 +18,8 @@ class PlayerAnimator {
     // Загружаем все спрайты
     frames.forEach((key, value) {
       final frame = value['frame'] as Map<String, dynamic>;
-      final spriteSourceSize = value['spriteSourceSize'] as Map<String, dynamic>;
+      final spriteSourceSize =
+          value['spriteSourceSize'] as Map<String, dynamic>;
       final sourceSize = value['sourceSize'] as Map<String, dynamic>;
 
       _sprites[key] = SpriteData(
@@ -70,28 +71,32 @@ class PlayerAnimator {
           frames.add(sprite);
         } else {
           // Запасной вариант, если спрайт не найден
-          frames.add(SpriteData(
-            name: spriteName,
-            frame: Rect.fromLTWH(0, 0, 64, 64),
-            spriteSourceSize: Rect.fromLTWH(0, 0, 64, 64),
-            sourceSize: const Size(128, 128),
-            trimmed: false,
-            rotated: false,
-          ));
+          frames.add(
+            SpriteData(
+              name: spriteName,
+              frame: Rect.fromLTWH(0, 0, 64, 64),
+              spriteSourceSize: Rect.fromLTWH(0, 0, 64, 64),
+              sourceSize: const Size(128, 128),
+              trimmed: false,
+              rotated: false,
+            ),
+          );
         }
 
         if (maskSprite != null) {
           maskFrames.add(maskSprite);
         } else {
           // Запасной вариант, если спрайт не найден
-          maskFrames.add(SpriteData(
-            name: maskSpriteName,
-            frame: Rect.fromLTWH(0, 0, 64, 64),
-            spriteSourceSize: Rect.fromLTWH(0, 0, 64, 64),
-            sourceSize: const Size(128, 128),
-            trimmed: false,
-            rotated: false,
-          ));
+          maskFrames.add(
+            SpriteData(
+              name: maskSpriteName,
+              frame: Rect.fromLTWH(0, 0, 64, 64),
+              spriteSourceSize: Rect.fromLTWH(0, 0, 64, 64),
+              sourceSize: const Size(128, 128),
+              trimmed: false,
+              rotated: false,
+            ),
+          );
         }
       }
 
@@ -105,7 +110,9 @@ class PlayerAnimator {
     final frames = _legSpriteAnimList[direction];
     if (frames == null || frames.isEmpty) return null;
 
-    final frameIndex = (animationValue * frames.length).floor() % frames.length;
+    // Убеждаемся что animationValue в диапазоне [0, 1)
+    final clampedValue = animationValue.clamp(0.0, 0.999999);
+    final frameIndex = (clampedValue * frames.length).floor() % frames.length;
     return frames[frameIndex];
   }
 
@@ -114,7 +121,9 @@ class PlayerAnimator {
     final frames = _legSpriteMaskAnimList[direction];
     if (frames == null || frames.isEmpty) return null;
 
-    final frameIndex = (animationValue * frames.length).floor() % frames.length;
+    // Убеждаемся что animationValue в диапазоне [0, 1)
+    final clampedValue = animationValue.clamp(0.0, 0.999999);
+    final frameIndex = (clampedValue * frames.length).floor() % frames.length;
     return frames[frameIndex];
   }
 

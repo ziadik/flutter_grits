@@ -27,7 +27,8 @@ class TileMapViewerWithEffects extends StatefulWidget {
   });
 
   @override
-  State<TileMapViewerWithEffects> createState() => _TileMapViewerWithEffectsState();
+  State<TileMapViewerWithEffects> createState() =>
+      _TileMapViewerWithEffectsState();
 }
 
 class _TileMapViewerWithEffectsState extends State<TileMapViewerWithEffects> {
@@ -56,7 +57,9 @@ class _TileMapViewerWithEffectsState extends State<TileMapViewerWithEffects> {
 
       // Загружаем эффекты
       final effectsCompleter = Completer<ImageInfo>();
-      final effectsStream = widget.effectsImage.resolve(ImageConfiguration.empty);
+      final effectsStream = widget.effectsImage.resolve(
+        ImageConfiguration.empty,
+      );
       effectsStream.addListener(
         ImageStreamListener(
           (info, _) => effectsCompleter.complete(info),
@@ -73,7 +76,10 @@ class _TileMapViewerWithEffectsState extends State<TileMapViewerWithEffects> {
       final effectsInfo = results[1];
 
       // Парсим спрайт-лист
-      final spriteSheet = SpriteSheet.fromJson(widget.effectsJson, widget.effectsImage);
+      final spriteSheet = SpriteSheet.fromJson(
+        widget.effectsJson,
+        widget.effectsImage,
+      );
 
       if (mounted) {
         setState(() {
@@ -106,16 +112,19 @@ class _TileMapViewerWithEffectsState extends State<TileMapViewerWithEffects> {
     final mapWidth = widget.mapData['width'] ?? 64;
     final mapHeight = widget.mapData['height'] ?? 48;
 
-    return SizedBox(
+    // Используйте Container вместо SizedBox для лучшей отрисовки
+    return Container(
       width: (mapWidth * tileWidth).toDouble(),
       height: (mapHeight * tileHeight).toDouble(),
       child: Stack(
         children: [
-          // Основные слои тайлов
+          // Только слои тайлов, без дополнительных элементов
           ..._buildTileLayers(),
 
           // Объекты environment
-          if (widget.showEffects && _effectsInfo != null && _spriteSheet != null)
+          if (widget.showEffects &&
+              _effectsInfo != null &&
+              _spriteSheet != null)
             _buildEnvironmentLayer(),
         ],
       ),
@@ -126,22 +135,25 @@ class _TileMapViewerWithEffectsState extends State<TileMapViewerWithEffects> {
     final layers = widget.mapData['layers'] as List<dynamic>? ?? [];
 
     return layers
-        .where((layer) => layer['visible'] == true && layer['type'] == 'tilelayer')
+        .where(
+          (layer) => layer['visible'] == true && layer['type'] == 'tilelayer',
+        )
         .map((layer) {
-      final data = layer['data'] as List<dynamic>? ?? [];
+          final data = layer['data'] as List<dynamic>? ?? [];
 
-      return CustomPaint(
-        painter: TileLayerPainter(
-          imageInfo: _tileSetInfo!,
-          tileIds: data.cast<int>(),
-          mapWidth: widget.mapData['width'] ?? 64,
-          mapHeight: widget.mapData['height'] ?? 48,
-          tileWidth: widget.mapData['tilewidth'] ?? 64,
-          tileHeight: widget.mapData['tileheight'] ?? 64,
-          opacity: (layer['opacity'] ?? 1.0).toDouble(),
-        ),
-      );
-    }).toList();
+          return CustomPaint(
+            painter: TileLayerPainter(
+              imageInfo: _tileSetInfo!,
+              tileIds: data.cast<int>(),
+              mapWidth: widget.mapData['width'] ?? 64,
+              mapHeight: widget.mapData['height'] ?? 48,
+              tileWidth: widget.mapData['tilewidth'] ?? 64,
+              tileHeight: widget.mapData['tileheight'] ?? 64,
+              opacity: (layer['opacity'] ?? 1.0).toDouble(),
+            ),
+          );
+        })
+        .toList();
   }
 
   Widget _buildEnvironmentLayer() {

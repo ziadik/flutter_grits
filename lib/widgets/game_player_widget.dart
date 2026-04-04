@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_grits/player/player_animator.dart';
 import 'package:flutter_grits/player/player_painter.dart';
 
-/// Виджет для отображения игрока на карте
-class GamePlayerWidget extends StatefulWidget {
+class GamePlayerWidget extends StatelessWidget {
   final PlayerAnimator animator;
   final ImageInfo effectsImageInfo;
   final double playerX;
@@ -40,36 +39,30 @@ class GamePlayerWidget extends StatefulWidget {
   });
 
   @override
-  State<GamePlayerWidget> createState() => _GamePlayerWidgetState();
-}
-
-class _GamePlayerWidgetState extends State<GamePlayerWidget> {
-  @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: widget.animationController,
+      animation: animationController,
       builder: (context, child) {
-        return Positioned(
-          left: widget.playerX - 64,
-          top: widget.playerY - 64,
-          child: CustomPaint(
-            painter: PlayerPainter(
-              animator: widget.animator,
-              effectsImageInfo: widget.effectsImageInfo,
-              direction: widget.playerDirection,
-              walking: widget.playerWalking,
-              animationValue: widget.animationController.value,
-              angle: widget.playerAngle,
-              team: widget.team,
-              name: widget.name,
-              health: widget.health,
-              maxHealth: widget.maxHealth,
-              energy: widget.energy,
-              maxEnergy: widget.maxEnergy,
-              isLocalPlayer: widget.isLocalPlayer,
-            ),
-            size: const Size(128, 128),
+        // Убеждаемся что значение анимации - double
+        final animationValue = animationController.value;
+
+        return CustomPaint(
+          painter: PlayerPainter(
+            animator: animator,
+            effectsImageInfo: effectsImageInfo,
+            direction: playerDirection,
+            walking: playerWalking,
+            animationValue: animationValue, // Это уже double
+            angle: playerAngle,
+            team: team,
+            name: name,
+            health: health,
+            maxHealth: maxHealth,
+            energy: energy,
+            maxEnergy: maxEnergy,
+            isLocalPlayer: isLocalPlayer,
           ),
+          size: const Size(64, 64),
         );
       },
     );
