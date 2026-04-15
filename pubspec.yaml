@@ -9,6 +9,10 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flame: ^1.37.0
+  flame_tiled: ^3.1.1
+  flame_tiled_utils: ^1.3.1
+  vector_math: ^2.2.0
 
 dev_dependencies:
   flutter_test:
@@ -19,8 +23,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/
-    - assets/maps/
-    - assets/grits_master.png
-    - assets/grits_effects.png
-    - assets/maps/small_map1.json
+    - assets/tiles/map1.tmx
+    - assets/tiles/map1.json
+    - assets/images/grits_master.png
     - assets/grits_effects.json
