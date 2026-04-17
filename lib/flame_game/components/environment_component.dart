@@ -1,6 +1,5 @@
 // lib/components/environment_component.dart
 import 'dart:math' as math;
-import 'dart:ui';
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
 
@@ -10,7 +9,7 @@ class EnvironmentComponent extends PositionComponent {
   final EnvironmentType type;
   final String name;
   final Map<String, dynamic> properties;
-  final Image effectsImage;
+  final Image? effectsImage;
 
   EnvironmentComponent({
     required super.position,
@@ -18,7 +17,7 @@ class EnvironmentComponent extends PositionComponent {
     required this.type,
     required this.name,
     required this.properties,
-    required this.effectsImage,
+    this.effectsImage,
   });
 
   @override
@@ -57,7 +56,7 @@ class EnvironmentComponent extends PositionComponent {
 
     // Отрисовка области
     final rect = Rect.fromLTWH(0, 0, width, height);
-    canvas.drawRect(rect, Paint()..color = color.withOpacity(0.5));
+    canvas.drawRect(rect, Paint()..color = color.withValues(alpha: 0.5));
     canvas.drawRect(
       rect,
       Paint()

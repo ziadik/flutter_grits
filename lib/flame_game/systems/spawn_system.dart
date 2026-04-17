@@ -1,6 +1,5 @@
 // lib/systems/spawn_system.dart
 import 'package:flame/components.dart';
-import 'package:flutter_grits/flame_game/entities/player.dart';
 import 'package:flutter_grits/flame_game/components/environment_component.dart';
 
 class SpawnSystem {

@@ -1,7 +1,6 @@
 // lib/models/player_animator.dart (переименуйте файл или исправьте импорты)
 import 'dart:ui';
 import 'package:flame/sprite.dart';
-import 'package:flutter_grits/flame_game/models/sprite_data.dart';
 import 'package:vector_math/vector_math.dart';
 
 /// Класс для анимации игрока - загрузка и управление спрайтами анимации

@@ -4,7 +4,7 @@ import 'dart:ui';
 import 'package:flutter/services.dart';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_grits/flame_game/player/player_animator.dart';
+import 'package:flutter_grits/flame_game/player/player_animator.dart'; // Исправлен импорт
 
 class ResourceManager {
   late PlayerAnimator playerAnimator;
@@ -30,7 +30,7 @@ class ResourceManager {
         'assets/images/grits_master.png',
       );
 
-      // Альтернативный способ: используем instantiateImageCodec
+      // Загрузка изображений
       _effectsImage = await _loadImageFromBytes(
         effectsImageData.buffer.asUint8List(),
       );

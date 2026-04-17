@@ -34,7 +34,7 @@ class HealthBarComponent extends PositionComponent {
     // Фон
     canvas.drawRect(
       Rect.fromLTWH(-width / 2, 0, width, height),
-      Paint()..color = Colors.black.withOpacity(0.5),
+      Paint()..color = Colors.black.withValues(alpha: 0.5),
     );
 
     // Полоска здоровья

@@ -1,15 +1,14 @@
 // lib/entities/player.dart
-import 'dart:math' as math;
-
 import 'package:flame/components.dart';
-import 'package:flame/effects.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_grits/flame_game/managers/resource_manager.dart';
+import 'package:flutter_grits/flame_game/managers/input_manager.dart';
 import 'package:flutter_grits/flame_game/components/health_bar_component.dart';
 import 'package:flutter_grits/flame_game/components/energy_bar_component.dart';
 
-class Player extends PositionComponent with HasGameReference {
+class Player extends PositionComponent {
   final ResourceManager resourceManager;
+  InputManager? inputManager; // Подключается из мира
 
   // Статистика
   double health = 100;
@@ -19,7 +18,7 @@ class Player extends PositionComponent with HasGameReference {
   int team = 0;
   String playerName = 'Player 1';
 
-  // Анимация
+  // Движение
   String _currentDirection = 'down';
   double _animationTimer = 0;
   bool _isWalking = false;
@@ -29,14 +28,14 @@ class Player extends PositionComponent with HasGameReference {
   // Компоненты
   late SpriteAnimationComponent _legsComponent;
   late SpriteAnimationComponent _legsMaskComponent;
-  late SpriteComponent _torsoComponent;
   late SpriteAnimationComponent _turretComponent;
   late HealthBarComponent _healthBar;
   late EnergyBarComponent _energyBar;
   late TextComponent _nameLabel;
 
-  // Параметры спрайтов
-  static const double spriteScale = 1.0;
+  bool _legsAnimationLoaded = false;
+  bool _turretAnimationLoaded = false;
+
   static const double playerSize = 64.0;
 
   @override
@@ -44,7 +43,7 @@ class Player extends PositionComponent with HasGameReference {
   @override
   set angle(double value) {
     _angle = value;
-    if (_turretComponent != null) {
+    if (_turretAnimationLoaded) {
       _turretComponent.angle = value;
     }
   }
@@ -58,84 +57,30 @@ class Player extends PositionComponent with HasGameReference {
   @override
   Future<void> onLoad() async {
     await super.onLoad();
+    await _createComponents();
+    await _loadAnimations();
+  }
 
-    // Инициализация компонентов
+  Future<void> _createComponents() async {
+    // Ноги
     _legsComponent = SpriteAnimationComponent(
       size: Vector2(playerSize, playerSize),
       anchor: Anchor.center,
     );
+
+    // Маска ног (для цвета команды)
     _legsMaskComponent = SpriteAnimationComponent(
       size: Vector2(playerSize, playerSize),
       anchor: Anchor.center,
     );
-    _torsoComponent = SpriteComponent(
-      size: Vector2(playerSize * 0.75, playerSize * 0.75),
-      anchor: Anchor.center,
-    );
+
+    // Турель
     _turretComponent = SpriteAnimationComponent(
       size: Vector2(playerSize, playerSize),
       anchor: Anchor.center,
     );
 
-    // Создание анимаций
-    _createLegsAnimation();
-    _createTorso();
-    _createTurret();
-    _createUIComponents();
-
-    // Добавление всех компонентов
-    await add(_legsComponent);
-    await add(_legsMaskComponent);
-    await add(_torsoComponent);
-    await add(_turretComponent);
-    await add(_healthBar);
-    await add(_energyBar);
-    await add(_nameLabel);
-  }
-
-  void _createLegsAnimation() {
-    final animator = resourceManager.playerAnimator;
-
-    final legSprites = animator.getLegSprites(_currentDirection);
-    if (legSprites.isNotEmpty) {
-      _legsComponent.animation = SpriteAnimation.spriteList(
-        legSprites,
-        stepTime: 1 / 30,
-        loop: true,
-      );
-
-      final maskSprites = animator.getLegMaskSprites(_currentDirection);
-      if (maskSprites.isNotEmpty) {
-        _legsMaskComponent.animation = SpriteAnimation.spriteList(
-          maskSprites,
-          stepTime: 1 / 30,
-          loop: true,
-        );
-        _legsMaskComponent.paint = Paint()
-          ..colorFilter = ColorFilter.mode(_getTeamColor(), BlendMode.multiply);
-      }
-    }
-  }
-
-  void _createTorso() {
-    // Можно использовать спрайт или простую фигуру
-    _torsoComponent.paint = Paint()
-      ..color = Colors.grey[800]!
-      ..style = PaintingStyle.fill;
-  }
-
-  void _createTurret() {
-    final turretSprite = resourceManager.playerAnimator.getTurretSprite();
-    if (turretSprite != null) {
-      _turretComponent.animation = SpriteAnimation.spriteList([
-        turretSprite,
-      ], stepTime: 1.0);
-    } else {
-      _turretComponent.paint = Paint()..color = Colors.grey[700]!;
-    }
-  }
-
-  void _createUIComponents() {
+    // UI компоненты
     _healthBar = HealthBarComponent(
       position: Vector2(0, -playerSize / 2 - 10),
       health: health,
@@ -161,16 +106,79 @@ class Player extends PositionComponent with HasGameReference {
         ),
       ),
     );
+
+    await addAll([
+      _legsComponent,
+      _legsMaskComponent,
+      _turretComponent,
+      _healthBar,
+      _energyBar,
+      _nameLabel,
+    ]);
+  }
+
+  Future<void> _loadAnimations() async {
+    final animator = resourceManager.playerAnimator;
+
+    // Ждем загрузки аниматора
+    int attempts = 0;
+    while (!animator.isLoaded && attempts < 50) {
+      await Future.delayed(const Duration(milliseconds: 100));
+      attempts++;
+    }
+
+    if (animator.isLoaded) {
+      await _createLegsAnimation();
+      await _createTurret();
+    }
+  }
+
+  Future<void> _createLegsAnimation() async {
+    final animator = resourceManager.playerAnimator;
+    final legSprites = animator.getLegSprites(_currentDirection);
+
+    if (legSprites.isNotEmpty) {
+      _legsComponent.animation = SpriteAnimation.spriteList(
+        legSprites,
+        stepTime: 1 / 30,
+        loop: true,
+      );
+      _legsAnimationLoaded = true;
+    }
+
+    final maskSprites = animator.getLegMaskSprites(_currentDirection);
+    if (maskSprites.isNotEmpty) {
+      _legsMaskComponent.animation = SpriteAnimation.spriteList(
+        maskSprites,
+        stepTime: 1 / 30,
+        loop: true,
+      );
+      _legsMaskComponent.paint = Paint()
+        ..colorFilter = ColorFilter.mode(_getTeamColor(), BlendMode.multiply);
+    }
+  }
+
+  Future<void> _createTurret() async {
+    final animator = resourceManager.playerAnimator;
+    final turretSprite = animator.getTurretSprite();
+
+    if (turretSprite != null) {
+      _turretComponent.animation = SpriteAnimation.spriteList([
+        turretSprite,
+      ], stepTime: 1.0);
+      _turretAnimationLoaded = true;
+    }
   }
 
   void move(Vector2 direction, double dt) {
     _isWalking = direction != Vector2.zero();
 
     if (_isWalking) {
+      // Движение
       final movement = direction * _walkSpeed * dt;
       position += movement;
 
-      // Обновление направления для анимации
+      // Обновление направления анимации
       _updateAnimationDirection(direction);
 
       // Обновление анимации
@@ -191,6 +199,8 @@ class Player extends PositionComponent with HasGameReference {
   }
 
   void _updateLegsAnimation() {
+    if (!_legsAnimationLoaded) return;
+
     final animator = resourceManager.playerAnimator;
     final legSprites = animator.getLegSprites(_currentDirection);
     final maskSprites = animator.getLegMaskSprites(_currentDirection);
