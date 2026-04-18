@@ -181,6 +181,7 @@ class Player extends PositionComponent {
     // Ноги
     _legsComponent = TrimmedSpriteAnimationComponent(
       size: Vector2(playerSize, playerSize),
+
       anchor: Anchor.center,
     );
 
@@ -192,7 +193,8 @@ class Player extends PositionComponent {
 
     // Турель
     _turretComponent = SpriteComponent(
-      size: Vector2(playerSize * 0.6, playerSize * 0.6),
+      size: Vector2(playerSize, playerSize),
+      position: Vector2(-20, -20),
       anchor: Anchor.center,
     );
 
@@ -211,7 +213,7 @@ class Player extends PositionComponent {
 
     _nameLabel = TextComponent(
       text: playerName,
-      position: Vector2(0, -playerSize / 2 - 18),
+      position: Vector2(0, -playerSize / 2 - 22),
       anchor: Anchor.center,
       textRenderer: TextPaint(
         style: const TextStyle(

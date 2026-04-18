@@ -1,436 +1,579 @@
-# KODA — Документация проекта flutter_grits
+# KODA.md — Контекст проекта Flutter Grits
 
-## Обзор проекта
-
-**flutter_grits** — это Flutter-приложение для просмотра и интерактивного взаимодействия с 2D тайловыми картами в стиле изометрических и ортогональных игр. Проект предоставляет инструментарий для визуализации карт из Tiled Map Editor, отрисовки анимированных спрайтов, управления игровым персонажем и слежения камеры за игроком.
-
-### Назначение
-
-Приложение предназначено для:
-- Отображения тайловых карт с поддержкой зума и панорамирования
-- Визуализации слоёв карты (основной слой, объекты environment)
-- Отрисовки анимированных объектов environment (спавнеры, powerup'ы)
-- Управления игровым персонажем с клавиатуры (WASD или стрелки)
-- Слежения камеры за игроком при движении по карте
-- Демонстрации работы со спрайт-листами в формате TexturePacker
-
-### Основные технологии
-
-- **Flutter** — фреймворк для кроссплатформенной разработки
-- **Dart** — язык программирования (версия ^3.10.3)
-- **CustomPainter** — высокопроизводительная отрисовка графики
-- **InteractiveViewer** — виджет для зума и панорамирования карты
-- **RawKeyboardListener** — обработка ввода с клавиатуры
-- **Tiled Map Editor** — формат JSON для тайловых карт
-- **TexturePacker** — формат JSON для спрайт-листов
+> Файл содержит полную документацию проекта для AI-ассистента Koda. Используй эту информацию для понимания архитектуры, стилей кодирования и целей проекта.
 
 ---
 
-## Архитектура
+## 📋 Обзор проекта
 
-Проект организован с модульной структурой:
+**Название:** `flutter_grits`  
+**Тип:** 2D-мультиплеерная игра на движке Flame (Flutter)  
+**Язык:** Dart / Flutter  
+**Статус:** Активная разработка, порт из оригинального JS-проекта
+
+### 🎯 Назначение
+
+Проект представляет собой переписывание классической 2D-игры **Grits** (оригинал на JavaScript/Box2D) на Flutter с использованием игрового движка **Flame**. Игра — командный шутер с видом сверху, где игроки управляют танкоподобными юнитами с турелью, перемещаются по карте, сражаются друг с другом и собирают бонусы.
+
+### 🏗️ Архитектура
 
 ```
-lib/
-├── main.dart                    # Точка входа приложения
-├── player.dart                  # Реэкспорт (возможно для обратной совместимости)
-├── models/
-│   └── sprite_data.dart         # Модели данных для спрайтов
-├── painters/
-│   ├── environment_painter.dart # Отрисовка объектов environment
-│   └── tile_layer_painter.dart  # Отрисовка слоёв тайлов карты
-├── player/
-│   ├── player_animator.dart     # Загрузка и управление анимацией персонажа
-│   └── player_painter.dart      # CustomPainter для отрисовки игрока
-├── screens/
-│   ├── effects_map_screen.dart  # Основной игровой экран
-│   └── map_loader_screen.dart   # Экран загрузки с асинхронной загрузкой ресурсов
-├── sprites/
-│   └── sprite_sheet.dart        # Утилита для работы со спрайтами из TexturePacker JSON
-└── widgets/
-    ├── game_player_widget.dart       # Виджет для отображения игрока
-    └── tile_map_viewer_with_effects.dart # Виджет для отображения карты с эффектами
+┌─────────────────────────────────────────────────────────┐
+│                    Flutter Application                   │
+│  ┌───────────────────────────────────────────────────┐  │
+│  │                  GritsGame (FlameGame)            │  │
+│  │  ┌─────────────┐  ┌──────────────┐  ┌──────────┐ │  │
+│  │  │   Camera    │  │  InputManager│  │ HUD Layer│ │  │
+│  │  └─────────────┘  └──────────────┘  └──────────┘ │  │
+│  │                         │                         │  │
+│  │  ┌─────────────────────────────────────────────┐  │  │
+│  │  │              GameWorld (World)              │  │  │
+│  │  │  ┌──────────┐  ┌────────────┐  ┌────────┐  │  │  │
+│  │  │  │ TiledMap │  │   Player   │  │Spawner │  │  │  │
+│  │  │  │(map1.tmx)│  │(PositionComponent)      │  │  │  │
+│  │  │  └──────────┘  └────────────┘  └────────┘  │  │  │
+│  │  │  ┌────────────┐  ┌──────────────────────┐  │  │  │
+│  │  │  │Environment │  │    SpawnSystem       │  │  │  │
+│  │  │  │Components  │  │ (таймерный спавн)    │  │  │  │
+│  │  │  └────────────┘  └──────────────────────┘  │  │  │
+│  │  └─────────────────────────────────────────────┘  │  │
+│  └───────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────┘
 ```
 
-### Основные компоненты
+### 🛠️ Технологический стек
 
-1. **MyApp** (main.dart) — корневой виджет приложения с MaterialApp
-
-2. **MapLoaderScreen** (screens/map_loader_screen.dart) — экран загрузки с асинхронной загрузкой ресурсов (карты и JSON эффектов)
-
-3. **EffectsMapScreen** (screens/effects_map_screen.dart) — основной игровой экран с:
-   - Управлением персонажем (WASD/стрелки)
-   - Слежением камеры за игроком
-   - Панелью инструментов (вкл/выкл эффектов, игрока, подписей, слежения)
-   - Кнопкой сброса позиции игрока
-
-4. **TileMapViewerWithEffects** (widgets/tile_map_viewer_with_effects.dart) — виджет для отображения тайловой карты с объектами environment
-
-5. **PlayerAnimator** (player/player_animator.dart) — загрузка и управление анимацией персонажа из TexturePacker JSON (30 кадров на направление: up, down, left, right)
-
-6. **PlayerPainter** (player/player_painter.dart) — CustomPainter для отрисовки игрока со спрайтами ног, туловища и turret
-
-7. **SpriteSheet** (sprites/sprite_sheet.dart) — утилита для работы со спрайтами из TexturePacker JSON
-
-8. **EnvironmentPainter** (painters/environment_painter.dart) — отрисовка объектов карты (Spawner'ы для QuadDamage, Energy, Health)
-
-9. **TileLayerPainter** (painters/tile_layer_painter.dart) — отрисовка слоёв тайлов карты
+| Категория | Технология | Версия |
+|-----------|------------|--------|
+| **Фреймворк** | Flutter | SDK ^3.10.3 |
+| **Игровой движок** | Flame | ^1.37.0 |
+| **Карты** | flame_tiled | ^3.1.1 |
+| **Математика** | vector_math | ^2.2.0 |
+| **Линтинг** | flutter_lints | ^6.0.0 |
 
 ---
 
-## Сборка и запуск
+## 📁 Структура проекта
 
-### Требования
+```
+flutter_grits/
+├── .metadata                 # Метаданные Flutter проекта
+├── pubspec.yaml              # Зависимости и конфигурация
+├── analysis_options.yaml     # Правила линтинга
+├── README.md                 # Краткое описание
+├── KODA.md                   # Этот файл — контекст для AI
+│
+├── lib/                      # Исходный код приложения
+│   ├── main.dart             # Точка входа, инициализация ResourceManager
+│   └── flame_game/
+│       ├── game/
+│       │   ├── grits_game.dart         # Основной класс игры (FlameGame)
+│       │   ├── camera_effects.dart     # Эффекты камеры (закомментировано)
+│       │   └── world/
+│       │       └── game_world.dart     # Игровой мир (загрузка карты, игрока)
+│       │
+│       ├── entities/
+│       │   └── player.dart             # Игрок с анимацией ходьбы (30 кадров/направление)
+│       │
+│       ├── components/
+│       │   ├── environment_component.dart  # Спавнеры, спавн-поинты, pickup'ы
+│       │   ├── energy_bar_component.dart   # UI: полоска энергии
+│       │   ├── health_bar_component.dart   # UI: полоска здоровья
+│       │   └── hud/
+│       │       ├── fps_counter.dart        # FPS счетчик (правый верхний угол)
+│       │       └── minimap.dart            # Мини-карта с камерой (левый нижний угол)
+│       │
+│       ├── managers/
+│       │   ├── input_manager.dart          # WASD/стрелки + мышь (целиться)
+│       │   └── resource_manager.dart       # Асинхронная загрузка ассетов
+│       │
+│       ├── models/
+│       │   ├── player_animator.dart        # Загрузка анимаций из TexturePacker JSON
+│       │   └── sprite_data.dart            # Модель данных спрайта
+│       │
+│       └── systems/
+│           └── spawn_system.dart           # Система спавна предметов
+│
+├── old_code_js/                # Оригинальный JS код (источник логики)
+│   ├── shared/                 # Общие компоненты (сервер + клиент)
+│   │   ├── core/               # Constants, GameEngine, Player, TileMap, PhysicsEngine
+│   │   ├── weapons/            # MachineGun, RocketLauncher, Shield, Sword, etc.
+│   │   ├── weaponinstances/    # Снаряды и эффекты
+│   │   └── items/              # EnergyCanister, HealthCanister, QuadDamage
+│   └── scripts/                # Клиентская часть (RenderEngine, InputEngine, GUI)
+│
+├── assets/                     # Игровые ресурсы
+│   ├── grits_effects.json      # TexturePacker JSON (2900+ спрайтов)
+│   ├── grits_effects.png       # ⚠️ ОТсутствует! Спрайт-лист эффектов
+│   ├── grits_master.png        # ⚠️ Отсутствует! Tileset карты 2048x2048
+│   ├── images/
+│   │   └── grits_master.png    # Дубликат tileset (тоже отсутствует)
+│   ├── maps/
+│   │   └── small_map1.json     # Маленькая карта для тестирования (64x48)
+│   ├── tiles/
+│   │   ├── map1.tmx            # Основная карта (Tiled)
+│   │   ├── map1.json           # JSON версия карты
+│   │   └── small_map1.tmx      # Маленькая карта (Tiled)
+│   └── sound/
+│       ├── bg_game.ogg         # Фоновая музыка (игра)
+│       ├── bg_menu.ogg         # Фоновая музыка (меню)
+│       ├── bounce0.ogg         # Звуки: прыжок, взрыв, оружие, меню
+│       ├── explode0.ogg        # ... (всего 12 звуков)
+│       └── LICENSE.txt         # Лицензии на музыку
+│
+└── web/                        # Веб-сборка (Flutter Web)
+    └── index.html
+```
 
-- Flutter SDK версии 3.10.3 или выше
-- Dart SDK версии 3.10.3 или выше
+---
 
-### Установка зависимостей
+## 🔑 Ключевые компоненты
+
+### 🎮 GritsGame (`lib/flame_game/game/grits_game.dart`)
+
+**Назначение:** Основной класс игры, наследуется от `FlameGame`.
+
+**Ответственность:**
+- Инициализация `InputManager` и `GameWorld`
+- Настройка камеры с `FixedSizeViewport(800x800)`
+- Обработка событий клавиатуры (`KeyboardEvents`)
+- Обновление `SpawnSystem` каждый кадр
+
+**Ключевой код:**
+```dart
+class GritsGame extends FlameGame with KeyboardEvents {
+  late InputManager inputManager;
+  late GameWorld gameWorld;
+
+  @override
+  Future<void> onLoad() async {
+    inputManager = InputManager();
+    gameWorld = GameWorld(resourceManager: resourceManager, inputManager: inputManager);
+    world = gameWorld;
+    await _setupCamera();
+  }
+}
+```
+
+**Примечание:** В коде есть закомментированный блок с альтернативной реализацией камеры с зумом и HUD.
+
+---
+
+### 🌍 GameWorld (`lib/flame_game/game/world/game_world.dart`)
+
+**Назначение:** Игровой мир — контейнер для всех игровых объектов.
+
+**Ответственность:**
+- Загрузка карты Tiled (`map1.tmx` с тайлом 64px)
+- Создание игрока в точке спавна
+- Загрузка объектов окружения (спавнеры, спавн-поинты)
+- Инициализация `SpawnSystem`
+- Обновление спавнеров каждый кадр
+
+**Ключевые поля:**
+```dart
+class GameWorld extends World {
+  late Player player;
+  late TiledComponent tiledMap;
+  late SpawnSystem spawnSystem;
+  int mapWidth = 6400;  // 100 тайлов × 64px
+  int mapHeight = 6400;
+  final List<EnvironmentComponent> spawners = [];
+}
+```
+
+**Логика спавна:**
+- Считывает слой `Environment` из Tiled карты
+- Создает `EnvironmentComponent` для каждого объекта
+- Регистрирует спавнеры в `SpawnSystem`
+
+---
+
+### 👤 Player (`lib/flame_game/entities/player.dart`)
+
+**Назначение:** Класс игрока — позиционируемый компонент с анимацией.
+
+**Статистика:**
+- Здоровье: `health = 100 / maxHealth = 100`
+- Энергия: `energy = 100 / maxEnergy = 100` (восстанавливается 20/сек)
+- Команда: `team = 0` или `1`
+- Размер: `128x128` пикселей
+
+**Анимация:**
+- 4 направления: `up`, `left`, `down`, `right`
+- 30 кадров на направление (из `walk_<dir>_XXXX.png`)
+- Класс `TrimmedSpriteAnimationComponent` обрабатывает обрезанные спрайты
+- Анимация останавливается на последнем кадре при остановке
+
+**Движение:**
+- Скорость: `200.0` пикселей/секунду
+- Управление: WASD или стрелки
+- Прицеливание: мышь (угол турели)
+
+**Ключевой метод:**
+```dart
+void updateMovement(double dt) {
+  final moveDir = inputManager!.moveDirection;
+  walking = moveDir != Vector2.zero();
+  // Обновление анимации и позиции
+  position += moveDir * _walkSpeed * dt;
+}
+```
+
+**Компоненты игрока:**
+- `_legsComponent` — анимация ног
+- `_legsMaskComponent` — маска ног (цвет команды)
+- `_turretComponent` — турель (статичный спрайт)
+- `_healthBar`, `_energyBar` — UI полоски
+- `_nameLabel` — имя игрока
+
+---
+
+### 🎨 PlayerAnimator (`lib/flame_game/models/player_animator.dart`)
+
+**Назначение:** Загрузка и управление анимациями из TexturePacker JSON.
+
+**Структура данных:**
+```dart
+class TrimmedSprite {
+  final Sprite sprite;
+  final Rect spriteSourceSize;  // Позиция обрезки
+  final Size sourceSize;        // Оригинальный размер (128x128)
+  final bool trimmed;
+  final Rect frame;
+}
+```
+
+**Методы:**
+- `loadImages(Image)` — загрузка изображения спрайт-листа
+- `loadFromJson(Map)` — парсинг JSON от TexturePacker
+- `getLegSprites(String direction)` — получение кадров ходьбы
+- `getLegMaskSprites(String direction)` — получение кадров маски
+- `getTurretSprite()` — получение спрайта турели
+
+**Примечание:** Метод `renderCentered()` центрирует обрезанные спрайты без растягивания.
+
+---
+
+### 🎯 InputManager (`lib/flame_game/managers/input_manager.dart`)
+
+**Назначение:** Обработка ввода с клавиатуры и мыши.
+
+**Функции:**
+- Клавиатура: WASD / стрелки — направление движения
+- Мышь: целевая позиция для прицеливания
+- Метод `moveDirection` возвращает нормализованный вектор движения
+
+**Настройки:**
+```dart
+bool keyboardEnabled = true;
+bool mouseMovementEnabled = true;
+double mouseSensitivity = 1.0;
+```
+
+**Примечание:** Поддержка мыши частично реализована (целиться можно, но стрельбы нет).
+
+---
+
+### 📦 ResourceManager (`lib/flame_game/managers/resource_manager.dart`)
+
+**Назначение:** Асинхронная загрузка всех игровых ресурсов.
+
+**Процесс загрузки:**
+1. Чтение `grits_effects.json` через `rootBundle`
+2. Загрузка `grits_effects.png` в память
+3. Парсинг JSON в `PlayerAnimator`
+4. Инициализация аниматора
+
+**Примечание:** Загрузка tileset'а (`grits_master.png`) закомментирована.
+
+---
+
+### 🔄 SpawnSystem (`lib/flame_game/systems/spawn_system.dart`)
+
+**Назначение:** Таймерный спавн предметов.
+
+**Логика:**
+- Хранит список спавнеров и таймеры для каждого
+- Обновляется каждый кадр через `update(dt, spawnItemCallback)`
+- Интервал спавна берется из свойства `SpawnInterval` (по умолчанию 5 сек)
+
+**Типы предметов (из JS кода):**
+- `QuadDamage` — умножение урона
+- `EnergyCanister` — восстановление энергии
+- `HealthCanister` — восстановление здоровья
+
+---
+
+### 🏗️ EnvironmentComponent (`lib/flame_game/components/environment_component.dart`)
+
+**Назначение:** Визуальное отображение объектов окружения.
+
+**Типы:**
+```dart
+enum EnvironmentType { spawner, spawnPoint, pickup }
+```
+
+**Отрисовка:**
+- Полупрозрачный прямоугольник с цветом по типу
+- Белая рамка
+- Иконка и подпись (например, "⚡ Quad", "🔋 Energy")
+
+**Цвета:**
+- Spawner (Quad): оранжевый
+- Spawner (Energy): синий
+- Spawner (Health): зеленый
+- SpawnPoint Team0: синий
+- SpawnPoint Team1: красный
+
+---
+
+## 🎨 Игровая механика (из original JS кода)
+
+### ⚔️ Оружие (не реализовано в Flutter)
+
+| Слот | JS-реализация | Статус |
+|------|---------------|--------|
+| 0 | ShotGun / ChainGun / MachineGun | ❌ Не реализовано |
+| 1 | Shield / Landmine | ❌ Не реализовано |
+| 2 | Thrusters | ❌ Не реализовано |
+
+### 📊 Баланс (из Constants.js)
+
+- **Game Loop:** 10 FPS (100ms между кадрами)
+- **Physics Loop:** 60 FPS (~16.67ms между кадрами)
+- **Tile Size:** 64x64 пикселей
+
+### 💔 Здоровье и энергия
+
+- **Здоровье:** 100 HP (смерть при 0)
+- **Энергия:** 100 MP (восстанавливается 20/сек)
+- **Стрельба:** требует энергию (зависит от оружия)
+
+### 🎯 Команды
+
+- **Team 0:** Синий цвет
+- **Team 1:** Оранжевый/красный цвет
+- **Spawners:** Разбросаны по карте
+- **Spawn Points:** 4 на команду
+
+---
+
+## 🏃 Архитектура оригинального JS проекта
+
+### 📂 shared/ (общий код)
+
+```
+shared/
+├── core/
+│   ├── Constants.js      # Глобальные константы
+│   ├── Entity.js         # Базовый класс сущности
+│   ├── GameEngine.js     # Главный движок (спавн, коллизии, update)
+│   ├── PhysicsEngine.js  # Box2D физика
+│   ├── Player.js         # Логика игрока
+│   ├── TileMap.js        # Загрузка Tiled карт
+│   ├── Timer.js          # Таймер для game loop
+│   ├── Util.js           # Утилиты
+│   ├── Weapon.js         # Базовый класс оружия
+│   └── WeaponInstance.js # Экземпляр снаряда
+├── weapons/              # Реализации оружия
+│   ├── BounceBallGun.js
+│   ├── ChainGun.js
+│   ├── Landmine.js
+│   ├── MachineGun.js
+│   ├── RocketLauncher.js
+│   ├── Shield.js
+│   ├── ShotGun.js
+│   ├── Sword.js
+│   └── Thrusters.js
+└── items/                # Предметы
+    ├── EnergyCanister.js
+    ├── HealthCanister.js
+    └── QuadDamage.js
+```
+
+### 📂 scripts/ (клиентский код)
+
+```
+scripts/
+├── core/
+│   ├── ClientGameEngine.js   # Клиентский GameEngine
+│   ├── ClientPlayer.js       # Клиентский Player
+│   ├── InputEngine.js        # Обработка ввода
+│   ├── RenderEngine.js       # Отрисовка на Canvas
+│   ├── SpriteSheet.js        # Управление спрайтами
+│   └── soundManager.js       # Управление звуками
+├── effects/                  # Визуальные эффекты
+├── gui/                      # Интерфейс
+│   ├── GuiEngine.js
+│   ├── HotSpot.js
+│   └── LightBox.js
+└── socket.io/                # WebSocket для мультиплеера
+```
+
+---
+
+## 🚀 Сборка и запуск
+
+### Предварительные требования
+
+- **Flutter SDK** ≥ 3.10.3
+- **Dart SDK** ≥ 3.10.3
+- **Игровые ассеты** (отсутствуют в репозитории!)
+
+### Команды
 
 ```bash
+# Установка зависимостей
 flutter pub get
-```
 
-### Запуск приложения
-
-```bash
-# Запуск на подключённом устройстве или эмуляторе
+# Запуск в режиме отладки
 flutter run
 
-# Запуск на конкретном устройстве (после просмотра списка устройств)
-flutter devices
-flutter run -d <device_id>
-
-# Запуск в режиме Chrome (для web)
+# Запуск в браузере
 flutter run -d chrome
-```
 
-### Сборка релизной версии
+# Сборка для веб
+flutter build web
 
-```bash
-# Android APK
-flutter build apk --release
-
-# Android App Bundle
-flutter build appbundle --release
-
-# iOS
-flutter build ios --release
-
-# Web
-flutter build web --release
-```
-
-### Тестирование
-
-```bash
-# Запуск всех тестов
+# Запуск тестов
 flutter test
 
-# Запуск тестов с покрытием
-flutter test --coverage
-
-# Запуск конкретного тестового файла
-flutter test test/player_test.dart
-```
-
-### Линтинг и анализ
-
-```bash
-# Проверка стиля кода
+# Анализ кода
 flutter analyze
-
-# Автоматическое исправление проблем
-dart fix --apply
 
 # Форматирование кода
 dart format .
 ```
 
+### ⚠️ Критические проблемы
+
+| Проблема | Влияние | Решение |
+|----------|---------|---------|
+| **Отсутствует `grits_effects.png`** | Анимации игрока не работают | Добавить файл в `assets/` |
+| **Отсутствует `grits_master.png`** | Карта не отображается | Добавить файл в `assets/` |
+| **Карта `map1.tmx` не найдена** | Игра не запускается | Проверить путь или использовать `small_map1.tmx` |
+
 ---
 
-## Правила разработки
+## 📝 Правила разработки
 
 ### Стиль кодирования
 
-Проект следует официальным рекомендациям Flutter и Dart:
-
-- Используйте `flutter_lints` для статического анализа (уже включён в dev_dependencies)
-- Следуйте руководству [Effective Dart](https://dart.dev/guides/language/effective-dart)
-- Используйте `const` конструкторы где возможно для оптимизации производительности
-- Именуйте файлы в `snake_case`, классы в `PascalCase`, переменные в `camelCase`
+- **Форматирование:** `dart format .` (стандартный Dart формат)
+- **Линтинг:** `flutter_lints` (включен через `analysis_options.yaml`)
+- **Именование:** `snake_case` для файлов и переменных, `PascalCase` для классов
+- **Документация:** Комментарии на русском языке, docstrings для публичных API
 
 ### Структура кода
 
-```dart
-// Импорты в алфавитном порядке (flutter -> dart -> пакетные -> локальные)
-import 'dart:async';
-import 'dart:convert';
-import 'dart:math' as math;
+1. **Разделение ответственности:**
+   - `game/` — главный класс игры
+   - `entities/` — игровые сущности (игрок, враги)
+   - `components/` — переиспользуемые UI компоненты
+   - `managers/` — менеджеры (ввод, ресурсы)
+   - `systems/` — игровые системы (спавн, физика)
+   - `models/` — модели данных
 
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-```
+2. **Использование Flame:**
+   - Наследование от `PositionComponent` для игровых объектов
+   - Использование `World` для контейнеров объектов
+   - `CameraComponent` для камеры с follow-логикой
 
-### Работа с CustomPainter
+3. **Асинхронность:**
+   - Загрузка ассетов через `Future` в `onLoad()`
+   - Использование `rootBundle` для чтения файлов
 
-При создании новых painter'ов:
+### Практики тестирования
 
-1. Наследуйтесь от `CustomPainter`
-2. Реализуйте методы `paint()` и `shouldRepaint()`
-3. Используйте `FilterQuality.none` и `isAntiAlias: false` для pixel-art графики
-4. Кэшируйте тяжёлые вычисления в конструкторе или initState
-
-```dart
-class MyPainter extends CustomPainter {
-  final ImageInfo imageInfo;
-  
-  MyPainter({required this.imageInfo});
-  
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..filterQuality = FilterQuality.none
-      ..isAntiAlias = false;
-    
-    // Отрисовка...
-  }
-  
-  @override
-  bool shouldRepaint(covariant MyPainter oldDelegate) {
-    return oldDelegate.imageInfo != imageInfo;
-  }
-}
-```
-
-### Работа с анимациями
-
-- Используйте `AnimationController` с `TickerProviderStateMixin`
-- Высвобождайте ресурсы в `dispose()`
-- Для анимации спрайтов используйте `AnimatedBuilder` для оптимизации
-
-```dart
-class _MyWidgetState extends State<MyWidget> with TickerProviderStateMixin {
-  late AnimationController _controller;
-  
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: Duration(milliseconds: 1000),
-    )..repeat();
-  }
-  
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-}
-```
-
-### Работа с ассетами
-
-- Все ассеты должны быть объявлены в `pubspec.yaml` в секции `flutter/assets`
-- Изображения загружаются асинхронно через `ImageStream`
-- JSON файлы парсятся с помощью `dart:convert`
-
-```dart
-// Загрузка изображения
-final imageStream = imageProvider.resolve(ImageConfiguration.empty);
-imageStream.addListener(ImageStreamListener((info, _) {
-  // Обработка загруженного изображения
-}));
-
-// Загрузка JSON
-final jsonString = await rootBundle.loadString('assets/file.json');
-final jsonData = jsonDecode(jsonString);
-```
-
-### Управление игроком
-
-Управление осуществляется с клавиатуры:
-- **W / Стрелка вверх** — движение вверх
-- **S / Стрелка вниз** — движение вниз
-- **A / Стрелка влево** — движение влево
-- **D / Стрелка вправо** — движение вправо
-
-Обработка ввода реализована через `RawKeyboardListener` с периодическим опросом состояния клавиш (таймер каждые 16мс ~60 FPS).
-
-### Слежение камеры за игроком
-
-Камера может следить за игроком при движении:
-
-- Включено по умолчанию (`_followPlayer = true`)
-- Управление через кнопку в AppBar (иконка GPS)
-- Плавное слежение с интерполяцией (lerp factor = 0.1)
-- При отключении можно вручную перемещаться по карте
-
-```dart
-// Обновление позиции камеры
-void _updateCameraPosition() {
-  final scale = _cameraController.value.getMaxScaleOnAxis();
-  final targetX = _playerX * scale - visibleWidth / 2;
-  const lerpFactor = 0.1;
-  final newX = currentX + (targetX - currentX) * lerpFactor;
-  // Применяем трансформацию...
-}
-```
-
-### Добавление новых карт
-
-1. Создайте JSON файл в `assets/maps/` в формате Tiled
-2. Убедитесь, что tileset изображение находится в `assets/`
-3. Добавьте путь к карте в код загрузки (MapLoaderScreen)
-
-Формат карты должен содержать:
-- `layers` — массив слоёв (tilelayer, objectgroup)
-- `tilewidth`, `tileheight` — размер тайла
-- `width`, `height` — размер карты в тайлах
-
-### Добавление новых спрайтов
-
-1. Упакуйте спрайты в TexturePacker и экспортируйте JSON
-2. Положите PNG в `assets/`, JSON в `assets/`
-3. Добавьте пути в `pubspec.yaml`
-4. Используйте `SpriteSheet.fromJson()` для загрузки
-
-### Отладка
-
-Для отладки используйте:
-- `print()` для простого логирования
-- `debugPrint()` для логирования с ограничением длины
-- Флаги `_showDebug` в виджетах для отображения дополнительной информации
+- Тесты в директории `test/`
+- Использование `flutter_test` пакета
+- Команда: `flutter test`
 
 ---
 
-## Формат файлов
+## 🎯 Планы развития (Roadmap)
 
-### Tiled Map JSON
+### 🔴 Приоритет 1 (Базовая играбельность)
 
-Пример структуры:
+- [ ] Добавить отсутствующие ассеты (grits_effects.png, grits_master.png)
+- [ ] Исправить путь к карте (map1.tmx → small_map1.tmx)
+- [ ] Реализовать базовую стрельбу (хотя бы один тип оружия)
+- [ ] Добавить коллизии (игрок ↔ стены, снаряды ↔ объекты)
 
-```json
-{
-  "width": 64,
-  "height": 48,
-  "tilewidth": 64,
-  "tileheight": 64,
-  "layers": [
-    {
-      "name": "base",
-      "type": "tilelayer",
-      "data": [1, 2, 3, ...],
-      "visible": true
-    },
-    {
-      "name": "environment",
-      "type": "objectgroup",
-      "objects": [
-        {
-          "name": "QuadDamageSpawner",
-          "type": "Spawner",
-          "x": 2748,
-          "y": 1022,
-          "width": 14,
-          "height": 12,
-          "properties": {
-            "SpawnItem": "QuadDamage"
-          }
-        }
-      ]
-    }
-  ]
-}
-```
+### 🟡 Приоритет 2 (Игровая механика)
 
-### TexturePacker JSON
+- [ ] Реализовать все типы оружия из JS кода
+- [ ] Добавить физику (Box2D через flame_box2d или кастомная)
+- [ ] Система здоровья/энергии с балансом
+- [ ] Эффекты попаданий и смерти
 
-Пример структуры:
+### 🟢 Приоритет 3 (Мультиплеер)
 
-```json
-{
-  "frames": {
-    "sprite_name.png": {
-      "frame": {"x": 100, "y": 50, "w": 64, "h": 64},
-      "rotated": false,
-      "trimmed": true,
-      "spriteSourceSize": {"x": 0, "y": 0, "w": 64, "h": 64},
-      "sourceSize": {"w": 128, "h": 128}
-    }
-  },
-  "meta": {
-    "image": "grits_effects.png",
-    "size": {"w": 2048, "h": 2048}
-  }
-}
-```
+- [ ] WebSocket сервер (Dart/Node.js)
+- [ ] Синхронизация состояния между клиентами
+- [ ] Командный матчмейкинг
+- [ ] Перезапуск игры после смерти
 
-### Имена спрайтов анимации игрока
+### 🔵 Приоритет 4 (Полировка)
 
-Анимация ходьбы использует формат:
-- `walk_up_XXXX.png` — движение вверх (30 кадров, XXXX = 0000-0029)
-- `walk_down_XXXX.png` — движение вниз
-- `walk_left_XXXX.png` — движение влево
-- `walk_right_XXXX.png` — движение вправо
-- `walk_*_mask_XXXX.png` — маски для окраски командой
+- [ ] Главное меню и пауза
+- [ ] Звуковые эффекты и фоновая музыка
+- [ ] Эффекты частиц (взрывы, следы)
+- [ ] UI: счетчик очков, табло результатов
+- [ ] Настройки (громкость, управление)
 
 ---
 
-## Ассеты проекта
+## 🔗 Полезные ссылки
 
-Текущее содержимое директории assets:
+### Документация
 
-```
-assets/
-├── grits_effects.json           # Описание спрайт-листа (TexturePacker)
-└── maps/
-    ├── map1.json                # Карта 1 (Tiled формат)
-    └── small_map1.json          # Маленькая карта для тестирования
-```
-
-### ВНИМАНИЕ: Отсутствующие ассеты
-
-В коде есть ссылки на следующие ассеты, которые **отсутствуют** в директории `assets/`:
-
-- `assets/grits_master.png` — Основной tileset карты (используется в TileMapViewerWithEffects)
-- `assets/grits_effects.png` — Спрайты эффектов и игрока (используется в EffectsMapScreen и TileMapViewerWithEffects)
-
-Эти файлы должны быть добавлены в директорию `assets/` для корректной работы приложения. Также необходимо убедиться, что они объявлены в `pubspec.yaml`.
-
----
-
-## Известные проблемы и TODO
-
-### Критические проблемы
-
-- [ ] **Отсутствуют ассеты**: Файлы `grits_master.png` и `grits_effects.png` не найдены в директории assets, что приведёт к ошибкам при запуске
-- [ ] Необходимо добавить недостающие ассеты и обновить pubspec.yaml
-
-### TODO
-
-- [ ] Добавить поддержку мультиплеера
-- [ ] Реализовать систему частиц
-- [ ] Добавить экспорт карты в изображение
-- [ ] Улучшить коллизии для игрока
-- [ ] Добавить звуковые эффекты
-- [ ] Добавить больше анимаций персонажа (стрельба, смерть и т.д.)
-
-### Известные ограничения
-
-- Анимации работают только с предустановленными спрайтами
-- Нет поддержки вращения тайлов (rotated спрайты не обрабатываются)
-- Коллизии игрока не реализованы
-- Поддерживается только ортогональная ориентация карт
-- Нет проверки границ карты при движении игрока
-- При отсутствии спрайтов ног рисуются простые овалы (fallback)
-
----
-
-## Контакт и поддержка
-
-Для вопросов по проекту обращайтесь к документации Flutter:
-- [Flutter Documentation](https://flutter.dev/docs)
-- [Dart Documentation](https://dart.dev/guides)
+- [Flame Engine Documentation](https://docs.fluttergame.org/)
+- [Flame Tiled Documentation](https://pub.dev/packages/flame_tiled)
 - [Tiled Map Editor](https://www.mapeditor.org/)
+- [TexturePacker](https://www.codeandweb.com/texturepacker)
+
+### Оригинальный проект
+
+- **JS-код:** `old_code_js/` — источник логики и механик
+- **Лицензия:** Apache 2.0 (Google Inc., 2012)
+
+---
+
+## 🐛 Известные проблемы
+
+1. **Анимации не работают** — отсутствует спрайт-лист `grits_effects.png`
+2. **Карта не загружается** — `map1.tmx` не найден, нужно использовать `small_map1.tmx`
+3. **Нет стрельбы** — система оружия не реализована
+4. **Нет физики** — коллизии работают только на уровне компонентов
+5. **Нет мультиплеера** — только одиночная игра
+6. **Нет звуков** — звуковые файлы есть, но не загружаются
+
+---
+
+## 💡 Советы для AI-ассистента
+
+1. **При чтении кода:**
+   - Сравнивай с оригинальным JS-кодом в `old_code_js/` для понимания логики
+   - Обращай внимание на закомментированные блоки — там может быть полезная альтернативная реализация
+
+2. **При добавлении фич:**
+   - Сначала проверь, есть ли аналог в `old_code_js/`
+   - Используй существующие паттерны (Component-based архитектура Flame)
+   - Не забудь добавить ассеты в `pubspec.yaml`
+
+3. **При исправлении багов:**
+   - Проверяй пути к ассетам
+   - Убеждайся, что `ResourceManager` завершил загрузку перед использованием
+   - Проверяй, что `GameWorld` загружен до доступа к `player`
+
+4. **При рефакторинге:**
+   - Сохраняй разделение ответственности (game, entities, components, managers)
+   - Используй `World` для контейнера игровых объектов
+   - Избегай жестких зависимостей между компонентами
+
+---
+
+*Последнее обновление: 2025*  
+*Версия документа: 1.0*
