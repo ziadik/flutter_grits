@@ -1,5 +1,5 @@
 // lib/game/world/game_world.dart
-import 'package:flame/camera.dart';
+
 import 'package:flame/components.dart';
 import 'package:flame_tiled/flame_tiled.dart';
 import 'package:flutter_grits/flame_game/entities/player.dart';
@@ -16,10 +16,9 @@ class GameWorld extends World {
   late Player player;
   late TiledComponent tiledMap;
   late SpawnSystem spawnSystem;
-  late CameraComponent camera;
 
-  int mapWidth = 0;
-  int mapHeight = 0;
+  int mapWidth = 6400;
+  int mapHeight = 6400;
 
   // Список всех спавнеров для быстрого доступа
   final List<EnvironmentComponent> spawners = [];
@@ -35,42 +34,8 @@ class GameWorld extends World {
   }
 
   Future<void> _loadMap() async {
-    debugPrint('🗺️ Загрузка карты...');
-
-    // Загрузка Tiled карты
-    tiledMap = await TiledComponent.load(
-      'map1.tmx',
-      Vector2.all(Player.playerSize),
-    );
+    tiledMap = await TiledComponent.load('map1.tmx', Vector2.all(64));
     await add(tiledMap);
-    debugPrint('✅ TiledComponent добавлен к GameWorld');
-
-    // Получение размеров карты в пикселях (tiledMap.size уже возвращает размер в пикселях!)
-    mapWidth = tiledMap.size.x.toInt();
-    mapHeight = tiledMap.size.y.toInt();
-
-    debugPrint(
-      '✅ Карта загружена: ${tiledMap.size.x.toInt()}x${tiledMap.size.y.toInt()} пикселей',
-    );
-
-    _centerCameraOnMap(Vector2.all(800));
-    await add(camera);
-    debugPrint('✅ Камера добавлена к GameWorld');
-  }
-
-  Future<void> _centerCameraOnMap(Vector2 gameSize) async {
-    final mapWidth = tiledMap.size.x;
-    final mapHeight = tiledMap.size.y;
-
-    final viewWidth = gameSize.x;
-    final viewHeight = gameSize.y;
-
-    camera = CameraComponent(
-      world: this,
-      viewport: FixedSizeViewport(viewWidth, viewHeight),
-    );
-    camera.viewfinder.position = Vector2(mapWidth / 2, mapHeight / 2);
-    camera.viewfinder.anchor = Anchor.center;
   }
 
   Future<void> _createPlayer() async {
@@ -158,18 +123,18 @@ class GameWorld extends World {
     // Здесь можно создать компонент предмета и добавить в мир
   }
 
-  @override
-  void update(double dt) {
-    super.update(dt);
+  // @override
+  // void update(double dt) {
+  //   super.update(dt);
 
-    // Обновляем движение игрока на основе ввода
-    final moveDirection = inputManager.moveDirection;
-    player.move(moveDirection, dt);
+  //   // Обновляем движение игрока на основе ввода
+  //   final moveDirection = inputManager.moveDirection;
+  //   player.move(moveDirection, dt);
 
-    // Обновляем угол поворота турели
-    if (moveDirection != Vector2.zero()) {
-      final angle = moveDirection.angleToSigned(Vector2(0, -1));
-      player.angle = angle;
-    }
-  }
+  //   // Обновляем угол поворота турели
+  //   if (moveDirection != Vector2.zero()) {
+  //     final angle = moveDirection.angleToSigned(Vector2(0, -1));
+  //     player.angle = angle;
+  //   }
+  // }
 }

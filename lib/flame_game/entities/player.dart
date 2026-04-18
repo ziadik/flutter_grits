@@ -1,14 +1,137 @@
 // lib/entities/player.dart
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_grits/flame_game/managers/resource_manager.dart';
 import 'package:flutter_grits/flame_game/managers/input_manager.dart';
 import 'package:flutter_grits/flame_game/components/health_bar_component.dart';
 import 'package:flutter_grits/flame_game/components/energy_bar_component.dart';
+import 'package:flutter_grits/flame_game/models/player_animator.dart';
+import 'dart:ui' as ui;
+
+class TrimmedSpriteAnimationComponent extends PositionComponent {
+  List<TrimmedSprite> _frames = [];
+  List<TrimmedSprite> _idleFrames = [];
+  double _stepTime = 0.1;
+  double _currentTime = 0;
+  int _currentFrame = 0;
+  bool _loop = true;
+  Paint? _paint;
+  bool _isPlaying = true;
+  bool _isWalking = false;
+  int _lastFrameIndex = 0; // Запоминаем последний кадр
+
+  TrimmedSpriteAnimationComponent({
+    required super.size,
+    required super.anchor,
+    List<TrimmedSprite>? frames,
+    List<TrimmedSprite>? idleFrames,
+    double stepTime = 0.1,
+    bool loop = true,
+    Paint? paint,
+  }) {
+    if (frames != null) {
+      _frames = frames;
+    }
+    if (idleFrames != null && idleFrames.isNotEmpty) {
+      _idleFrames = idleFrames;
+    } else if (frames != null && frames.isNotEmpty) {
+      // Если нет idle кадров, используем первый кадр анимации
+      _idleFrames = [frames.first];
+    }
+    _stepTime = stepTime;
+    _loop = loop;
+    _paint = paint;
+  }
+
+  void setAnimation(
+    List<TrimmedSprite> frames, {
+    double stepTime = 0.1,
+    bool loop = true,
+  }) {
+    _frames = frames;
+    _stepTime = stepTime;
+    _loop = loop;
+    _currentFrame = 0;
+    _currentTime = 0;
+  }
+
+  void setWalking(bool walking) {
+    if (_isWalking == walking) return;
+    _isWalking = walking;
+
+    if (!_isWalking) {
+      // Останавливаемся - запоминаем последний кадр
+      _lastFrameIndex = _currentFrame;
+    } else {
+      // Начинаем движение - продолжаем с того же кадра
+      _currentFrame = _lastFrameIndex;
+    }
+    _currentTime = 0;
+  }
+
+  void play() {
+    _isPlaying = true;
+  }
+
+  void stop() {
+    _isPlaying = false;
+  }
+
+  set paint(Paint? paint) {
+    _paint = paint;
+  }
+
+  Paint? get paint => _paint;
+
+  @override
+  void update(double dt) {
+    super.update(dt);
+
+    if (!_isPlaying) return;
+
+    // Если не идем, не обновляем кадры - оставляем последний кадр
+    if (!_isWalking) {
+      return;
+    }
+
+    if (_frames.isEmpty) return;
+
+    _currentTime += dt;
+
+    if (_currentTime >= _stepTime) {
+      _currentTime = 0;
+      _currentFrame++;
+
+      if (_currentFrame >= _frames.length) {
+        if (_loop) {
+          _currentFrame = 0;
+        } else {
+          _currentFrame = _frames.length - 1;
+          _isPlaying = false;
+        }
+      }
+    }
+  }
+
+  @override
+  void render(Canvas canvas) {
+    super.render(canvas);
+
+    if (_frames.isEmpty) return;
+
+    // При ходьбе показываем текущий кадр анимации
+    // При остановке показываем последний кадр, на котором остановились
+    final frameIndex = _isWalking ? _currentFrame : _lastFrameIndex;
+    final frame = _frames[frameIndex.clamp(0, _frames.length - 1)];
+
+    frame.renderCentered(canvas, Vector2.zero(), Size(size.x, size.y), _paint);
+  }
+}
 
 class Player extends PositionComponent {
   final ResourceManager resourceManager;
-  InputManager? inputManager; // Подключается из мира
+  InputManager? inputManager;
 
   // Статистика
   double health = 100;
@@ -17,36 +140,29 @@ class Player extends PositionComponent {
   double maxEnergy = 100;
   int team = 0;
   String playerName = 'Player 1';
+  bool isDead = false;
 
   // Движение
-  String _currentDirection = 'down';
-  double _animationTimer = 0;
-  bool _isWalking = false;
+  int _currLegAnimIndex = 2; // 2 = down
+  bool walking = false;
   final double _walkSpeed = 200.0;
-  double _angle = 0;
+  double faceAngleRadians = 0;
 
-  // Компоненты
-  late SpriteAnimationComponent _legsComponent;
-  late SpriteAnimationComponent _legsMaskComponent;
-  late SpriteAnimationComponent _turretComponent;
+  // Компоненты для отрисовки
+  late TrimmedSpriteAnimationComponent _legsComponent;
+  late TrimmedSpriteAnimationComponent _legsMaskComponent;
+  late SpriteComponent _turretComponent;
+
+  // UI компоненты
   late HealthBarComponent _healthBar;
   late EnergyBarComponent _energyBar;
   late TextComponent _nameLabel;
 
-  bool _legsAnimationLoaded = false;
-  bool _turretAnimationLoaded = false;
+  // Хранилище анимаций для каждого направления
+  final Map<int, List<TrimmedSprite>> _walkAnimations = {};
+  final Map<int, List<TrimmedSprite>> _idleAnimations = {};
 
-  static const double playerSize = 64.0;
-
-  @override
-  double get angle => _angle;
-  @override
-  set angle(double value) {
-    _angle = value;
-    if (_turretAnimationLoaded) {
-      _turretComponent.angle = value;
-    }
-  }
+  static const double playerSize = 128.0;
 
   Player({required super.position, required this.resourceManager}) {
     width = playerSize;
@@ -63,20 +179,20 @@ class Player extends PositionComponent {
 
   Future<void> _createComponents() async {
     // Ноги
-    _legsComponent = SpriteAnimationComponent(
+    _legsComponent = TrimmedSpriteAnimationComponent(
       size: Vector2(playerSize, playerSize),
       anchor: Anchor.center,
     );
 
-    // Маска ног (для цвета команды)
-    _legsMaskComponent = SpriteAnimationComponent(
+    // Маска ног
+    _legsMaskComponent = TrimmedSpriteAnimationComponent(
       size: Vector2(playerSize, playerSize),
       anchor: Anchor.center,
     );
 
     // Турель
-    _turretComponent = SpriteAnimationComponent(
-      size: Vector2(playerSize, playerSize),
+    _turretComponent = SpriteComponent(
+      size: Vector2(playerSize * 0.6, playerSize * 0.6),
       anchor: Anchor.center,
     );
 
@@ -115,12 +231,35 @@ class Player extends PositionComponent {
       _energyBar,
       _nameLabel,
     ]);
+
+    await _loadTurretSprite();
+  }
+
+  Future<void> _loadTurretSprite() async {
+    final animator = resourceManager.playerAnimator;
+    final turretTrimmedSprite = animator.getTurretSprite();
+
+    if (turretTrimmedSprite != null) {
+      final pictureRecorder = ui.PictureRecorder();
+      final canvas = Canvas(pictureRecorder);
+      turretTrimmedSprite.renderCentered(
+        canvas,
+        Vector2.zero(),
+        Size(_turretComponent.size.x, _turretComponent.size.y),
+        null,
+      );
+      final picture = pictureRecorder.endRecording();
+      final image = await picture.toImage(
+        _turretComponent.size.x.toInt(),
+        _turretComponent.size.y.toInt(),
+      );
+      _turretComponent.sprite = Sprite(image);
+    }
   }
 
   Future<void> _loadAnimations() async {
     final animator = resourceManager.playerAnimator;
 
-    // Ждем загрузки аниматора
     int attempts = 0;
     while (!animator.isLoaded && attempts < 50) {
       await Future.delayed(const Duration(milliseconds: 100));
@@ -128,115 +267,142 @@ class Player extends PositionComponent {
     }
 
     if (animator.isLoaded) {
-      await _createLegsAnimation();
-      await _createTurret();
+      await _loadAllAnimations();
+      _updateAnimation();
     }
   }
 
-  Future<void> _createLegsAnimation() async {
+  Future<void> _loadAllAnimations() async {
     final animator = resourceManager.playerAnimator;
-    final legSprites = animator.getLegSprites(_currentDirection);
+    final directions = ['up', 'left', 'down', 'right'];
 
-    if (legSprites.isNotEmpty) {
-      _legsComponent.animation = SpriteAnimation.spriteList(
-        legSprites,
-        stepTime: 1 / 30,
-        loop: true,
-      );
-      _legsAnimationLoaded = true;
-    }
+    for (int i = 0; i < directions.length; i++) {
+      final dir = directions[i];
+      final walkSprites = animator.getLegSprites(dir);
+      final maskSprites = animator.getLegMaskSprites(dir);
 
-    final maskSprites = animator.getLegMaskSprites(_currentDirection);
-    if (maskSprites.isNotEmpty) {
-      _legsMaskComponent.animation = SpriteAnimation.spriteList(
-        maskSprites,
-        stepTime: 1 / 30,
-        loop: true,
-      );
-      _legsMaskComponent.paint = Paint()
-        ..colorFilter = ColorFilter.mode(_getTeamColor(), BlendMode.multiply);
-    }
-  }
+      if (walkSprites.isNotEmpty) {
+        _walkAnimations[i] = walkSprites;
+        // Idle анимация - только первый кадр
+        _idleAnimations[i] = [walkSprites.first];
+      }
 
-  Future<void> _createTurret() async {
-    final animator = resourceManager.playerAnimator;
-    final turretSprite = animator.getTurretSprite();
-
-    if (turretSprite != null) {
-      _turretComponent.animation = SpriteAnimation.spriteList([
-        turretSprite,
-      ], stepTime: 1.0);
-      _turretAnimationLoaded = true;
-    }
-  }
-
-  void move(Vector2 direction, double dt) {
-    _isWalking = direction != Vector2.zero();
-
-    if (_isWalking) {
-      // Движение
-      final movement = direction * _walkSpeed * dt;
-      position += movement;
-
-      // Обновление направления анимации
-      _updateAnimationDirection(direction);
-
-      // Обновление анимации
-      _animationTimer += dt;
-      if (_animationTimer >= 1 / 30) {
-        _animationTimer = 0;
-        _updateLegsAnimation();
+      if (maskSprites.isNotEmpty) {
+        // Для маски тоже сохраняем
       }
     }
   }
 
-  void _updateAnimationDirection(Vector2 direction) {
-    if (direction.y.abs() > direction.x.abs()) {
-      _currentDirection = direction.y > 0 ? 'down' : 'up';
-    } else {
-      _currentDirection = direction.x > 0 ? 'right' : 'left';
+  void _updateAnimation() {
+    final walkFrames = _walkAnimations[_currLegAnimIndex];
+    final idleFrames = _idleAnimations[_currLegAnimIndex];
+
+    if (walkFrames != null) {
+      _legsComponent.setAnimation(walkFrames, stepTime: 1 / 30, loop: true);
+    }
+
+    if (idleFrames != null) {
+      // Передаем idle кадры в компонент
+    }
+
+    final maskWalkFrames = resourceManager.playerAnimator.getLegMaskSprites(
+      _getDirectionString(_currLegAnimIndex),
+    );
+    if (maskWalkFrames.isNotEmpty) {
+      _legsMaskComponent.setAnimation(
+        maskWalkFrames,
+        stepTime: 1 / 30,
+        loop: true,
+      );
+      // _legsMaskComponent.paint = Paint()
+      //   ..colorFilter = ColorFilter.mode(_getTeamColor(), BlendMode.multiply);
+    }
+
+    final maskIdleFrames = maskWalkFrames.isNotEmpty
+        ? [maskWalkFrames.first]
+        : [];
+    if (maskIdleFrames.isNotEmpty) {
+      // Idle кадры для маски
     }
   }
 
-  void _updateLegsAnimation() {
-    if (!_legsAnimationLoaded) return;
-
-    final animator = resourceManager.playerAnimator;
-    final legSprites = animator.getLegSprites(_currentDirection);
-    final maskSprites = animator.getLegMaskSprites(_currentDirection);
-
-    if (legSprites.isNotEmpty) {
-      _legsComponent.animation = SpriteAnimation.spriteList(
-        legSprites,
-        stepTime: 1 / 30,
-        loop: true,
-      );
-    }
-
-    if (maskSprites.isNotEmpty) {
-      _legsMaskComponent.animation = SpriteAnimation.spriteList(
-        maskSprites,
-        stepTime: 1 / 30,
-        loop: true,
-      );
-    }
+  String _getDirectionString(int index) {
+    const directions = ['up', 'left', 'down', 'right'];
+    return directions[index];
   }
 
   Color _getTeamColor() {
-    const teamColors = [
-      Color(0xFF33FF33), // Team 0 - Green
-      Color(0xFFFF9933), // Team 1 - Orange
-    ];
+    const teamColors = [Color(0xFF33FF33), Color(0xFFFF9933)];
     return teamColors[team % teamColors.length];
+  }
+
+  void updateMovement(double dt) {
+    if (inputManager == null) return;
+
+    final moveDir = inputManager!.moveDirection;
+    final wasWalking = walking;
+    walking = moveDir != Vector2.zero();
+
+    // Обновляем состояние анимации (ходьба/покой)
+    if (walking != wasWalking) {
+      _legsComponent.setWalking(walking);
+      _legsMaskComponent.setWalking(walking);
+    }
+
+    final pressedKeys = inputManager!.getPressedKeys();
+
+    int newAnimIndex = _currLegAnimIndex;
+
+    if (pressedKeys.contains(LogicalKeyboardKey.keyW) ||
+        pressedKeys.contains(LogicalKeyboardKey.arrowUp)) {
+      newAnimIndex = 0;
+    } else if (pressedKeys.contains(LogicalKeyboardKey.keyS) ||
+        pressedKeys.contains(LogicalKeyboardKey.arrowDown)) {
+      newAnimIndex = 2;
+    }
+
+    if (pressedKeys.contains(LogicalKeyboardKey.keyA) ||
+        pressedKeys.contains(LogicalKeyboardKey.arrowLeft)) {
+      newAnimIndex = 1;
+    } else if (pressedKeys.contains(LogicalKeyboardKey.keyD) ||
+        pressedKeys.contains(LogicalKeyboardKey.arrowRight)) {
+      newAnimIndex = 3;
+    }
+
+    if (newAnimIndex != _currLegAnimIndex) {
+      _currLegAnimIndex = newAnimIndex;
+      _updateAnimation();
+      // Сбрасываем состояние ходьбы для новой анимации
+      _legsComponent.setWalking(walking);
+      _legsMaskComponent.setWalking(walking);
+    }
+
+    if (walking) {
+      final movement = moveDir * _walkSpeed * dt;
+      position += movement;
+    }
+
+    if (inputManager!.mousePosition != null) {
+      final directionToAim = inputManager!.mousePosition! - position;
+      if (directionToAim.length2 > 0) {
+        faceAngleRadians = directionToAim.angleToSigned(Vector2(0, -1));
+        _turretComponent.angle = -1.0 * 3.14159 + faceAngleRadians;
+      }
+    }
   }
 
   void takeDamage(double amount) {
     health = (health - amount).clamp(0, maxHealth);
     _healthBar.updateHealth(health, maxHealth);
 
-    if (health <= 0) {
+    if (health <= 0 && !isDead) {
       die();
     }
+  }
+
+  void die() {
+    isDead = true;
+    removeFromParent();
   }
 
   void useEnergy(double amount) {
@@ -244,15 +410,14 @@ class Player extends PositionComponent {
     _energyBar.updateEnergy(energy, maxEnergy);
   }
 
-  void die() {
-    removeFromParent();
-  }
-
   @override
   void update(double dt) {
     super.update(dt);
 
-    // Регенерация энергии
+    if (!isDead) {
+      updateMovement(dt);
+    }
+
     if (energy < maxEnergy) {
       energy = (energy + 20 * dt).clamp(0, maxEnergy);
       _energyBar.updateEnergy(energy, maxEnergy);

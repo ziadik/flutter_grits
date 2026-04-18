@@ -1,303 +1,310 @@
-// lib/game/grits_game.dart
-import 'package:flame/camera.dart';
-import 'package:flame/components.dart';
-import 'package:flame/game.dart';
-import 'package:flame/input.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter/widgets.dart';
-import 'package:flutter_grits/flame_game/managers/input_manager.dart';
-import 'package:flutter_grits/flame_game/managers/resource_manager.dart';
-import 'package:flutter_grits/flame_game/game/world/game_world.dart';
-import 'package:flutter_grits/flame_game/components/hud/fps_counter.dart';
-import 'package:flutter_grits/flame_game/components/hud/minimap.dart';
-import 'package:flame/effects.dart';
-import 'package:flutter/material.dart';
+// // lib/game/grits_game.dart
+// import 'package:flame/camera.dart';
+// import 'package:flame/components.dart';
+// import 'package:flame/game.dart';
+// import 'package:flame/input.dart';
+// import 'package:flame_tiled/flame_tiled.dart';
+// import 'package:flutter/services.dart';
+// import 'package:flutter/widgets.dart';
+// import 'package:flutter_grits/flame_game/managers/input_manager.dart';
+// import 'package:flutter_grits/flame_game/managers/resource_manager.dart';
+// import 'package:flutter_grits/flame_game/game/world/game_world.dart';
+// import 'package:flutter_grits/flame_game/components/hud/fps_counter.dart';
+// import 'package:flutter_grits/flame_game/components/hud/minimap.dart';
+// import 'package:flame/effects.dart';
+// import 'package:flutter/material.dart';
 
-class GritsGameg extends FlameGame with KeyboardEvents {
-  late ResourceManager resourceManager;
-  late InputManager inputManager;
-  late GameWorld gameWorld;
-  late CameraComponent mainCamera;
+// class GritsGame extends FlameGame with KeyboardEvents {
+//   late ResourceManager resourceManager;
+//   late InputManager inputManager;
+//   // late GameWorld gameWorld;
+//   late CameraComponent mainCamera;
 
-  // Конфигурация камеры
-  static const targetResolution = Size(1920, 1080);
-  static const cameraFollowSpeed = 300.0;
-  static const minZoom = 0.5;
-  static const maxZoom = 2.0;
-  static const defaultZoom = 1.0;
+//   late TiledComponent mapComponent;
 
-  bool _isInitialized = false;
+//   // Конфигурация камеры
+//   static const targetResolution = Size(1920, 1080);
+//   static const cameraFollowSpeed = 300.0;
+//   static const minZoom = 0.5;
+//   static const maxZoom = 2.0;
+//   static const defaultZoom = 1.0;
 
-  @override
-  Future<void> onLoad() async {
-    debugPrint('🎮 Загрузка GritsGame...');
+//   bool _isInitialized = false;
 
-    await _initializeManagers();
-    await _createWorld();
-    await _setupCamera();
-    _setupHUD();
+//   @override
+//   Future<void> onLoad() async {
+//     debugPrint('🎮 Загрузка GritsGame...');
 
-    _isInitialized = true;
-    debugPrint('✅ GritsGame полностью загружена');
-  }
+//     await _initializeManagers();
+//     mapComponent = await TiledComponent.load('map1.tmx', Vector2.all(64));
+//     mapComponent.scale = Vector2.all(1);
 
-  Future<void> _initializeManagers() async {
-    debugPrint('📦 Инициализация менеджеров...');
+//     await world.add(mapComponent);
+//     //await _createWorld();
+//     await _setupCamera();
+//     _setupHUD();
 
-    resourceManager = ResourceManager();
-    inputManager = InputManager();
+//     _isInitialized = true;
+//     debugPrint('✅ GritsGame полностью загружена');
+//   }
 
-    await resourceManager.loadResources();
-    debugPrint('✅ Ресурсы загружены');
-  }
+//   Future<void> _initializeManagers() async {
+//     debugPrint('📦 Инициализация менеджеров...');
 
-  Future<void> _createWorld() async {
-    debugPrint('🌍 Создание игрового мира...');
+//     resourceManager = ResourceManager();
+//     inputManager = InputManager();
 
-    gameWorld = GameWorld(
-      resourceManager: resourceManager,
-      inputManager: inputManager,
-    );
+//     await resourceManager.loadResources();
+//     debugPrint('✅ Ресурсы загружены');
+//   }
 
-    await gameWorld.onLoad();
-    await world.add(gameWorld);
+//   // Future<void> _createWorld() async {
+//   //   debugPrint('🌍 Создание игрового мира...');
 
-    debugPrint('✅ Мир создан: ${gameWorld.mapWidth}x${gameWorld.mapHeight}');
-  }
+//   //   gameWorld = GameWorld(
+//   //     resourceManager: resourceManager,
+//   //     inputManager: inputManager,
+//   //   );
 
-  Future<void> _setupCamera() async {
-    debugPrint('📷 Настройка камеры...');
+//   //   await gameWorld.onLoad();
+//   //   await world.add(gameWorld);
 
-    // Создаем камеру с фиксированным вьюпортом
-    mainCamera = CameraComponent(
-      world: world,
-      viewport: FixedSizeViewport(
-        targetResolution.width,
-        targetResolution.height,
-      ),
-    );
+//   //   debugPrint('✅ Мир создан: ${gameWorld.mapWidth}x${gameWorld.mapHeight}');
+//   // }
 
-    // Настраиваем видоискатель
-    mainCamera.viewfinder.anchor = Anchor.center;
-    mainCamera.viewfinder.zoom = defaultZoom;
+//   Future<void> _setupCamera() async {
+//     debugPrint('📷 Настройка камеры...');
 
-    // Устанавливаем границы камеры
-    _setupCameraBounds();
+//     // Создаем камеру с фиксированным вьюпортом
+//     mainCamera = CameraComponent(
+//       world: world,
+//       viewport: FixedSizeViewport(
+//         targetResolution.width,
+//         targetResolution.height,
+//       ),
+//     );
 
-    // Включаем следование за игроком
-    _setupCameraFollow();
+//     // Настраиваем видоискатель
+//     mainCamera.viewfinder.anchor = Anchor.center;
+//     mainCamera.viewfinder.zoom = defaultZoom;
 
-    // Устанавливаем начальную позицию камеры
-    _centerCameraOnPlayer();
+//     // Устанавливаем границы камеры
+//     _setupCameraBounds();
 
-    await add(mainCamera);
-    debugPrint('✅ Камера добавлена');
-  }
+//     // Включаем следование за игроком
+//     _setupCameraFollow();
 
-  void _setupCameraBounds() {
-    // Ограничиваем движение камеры границами карты
-    final worldBounds = Rect.fromLTWH(
-      0,
-      0,
-      gameWorld.mapWidth.toDouble(),
-      gameWorld.mapHeight.toDouble(),
-    );
+//     // Устанавливаем начальную позицию камеры
+//     _centerCameraOnPlayer();
 
-    // Получаем размеры вьюпорта в мировых координатах с учетом зума
-    final viewportWidth = targetResolution.width / mainCamera.viewfinder.zoom;
-    final viewportHeight = targetResolution.height / mainCamera.viewfinder.zoom;
+//     await add(mainCamera);
+//     debugPrint('✅ Камера добавлена');
+//   }
 
-    // Вычисляем границы для камеры
-    final minX = viewportWidth / 2;
-    final maxX = gameWorld.mapWidth - viewportWidth / 2;
-    final minY = viewportHeight / 2;
-    final maxY = gameWorld.mapHeight - viewportHeight / 2;
+//   void _setupCameraBounds() {
+//     // Ограничиваем движение камеры границами карты
+//     final worldBounds = Rect.fromLTWH(
+//       0,
+//       0,
+//       gameWorld.mapWidth.toDouble(),
+//       gameWorld.mapHeight.toDouble(),
+//     );
 
-    // Создаем прямоугольник ограничений
-    final boundsRect = Rect.fromLTWH(minX, minY, maxX - minX, maxY - minY);
+//     // Получаем размеры вьюпорта в мировых координатах с учетом зума
+//     final viewportWidth = targetResolution.width / mainCamera.viewfinder.zoom;
+//     final viewportHeight = targetResolution.height / mainCamera.viewfinder.zoom;
 
-    // Применяем ограничения к видоискателю
-    mainCamera.viewfinder.position.clamp(
-      Vector2(minX, minY),
-      Vector2(maxX, maxY),
-    );
-  }
+//     // Вычисляем границы для камеры
+//     final minX = viewportWidth / 2;
+//     final maxX = gameWorld.mapWidth - viewportWidth / 2;
+//     final minY = viewportHeight / 2;
+//     final maxY = gameWorld.mapHeight - viewportHeight / 2;
 
-  void _setupCameraFollow() {
-    // Настраиваем плавное следование за игроком
-    mainCamera.follow(
-      gameWorld.player,
-      maxSpeed: cameraFollowSpeed,
-      snap: true,
-    );
-  }
+//     // Создаем прямоугольник ограничений
+//     final boundsRect = Rect.fromLTWH(minX, minY, maxX - minX, maxY - minY);
 
-  void _centerCameraOnPlayer() {
-    // Центрируем камеру на игроке
-    final playerPos = gameWorld.player.position;
-    mainCamera.viewfinder.position = playerPos;
-  }
+//     // Применяем ограничения к видоискателю
+//     mainCamera.viewfinder.position.clamp(
+//       Vector2(minX, minY),
+//       Vector2(maxX, maxY),
+//     );
+//   }
 
-  void _setupHUD() {
-    debugPrint('🎨 Настройка HUD...');
+//   void _setupCameraFollow() {
+//     // Настраиваем плавное следование за игроком
+//     mainCamera.follow(
+//       gameWorld.player,
+//       maxSpeed: cameraFollowSpeed,
+//       snap: true,
+//     );
+//   }
 
-    // FPS счетчик (правый верхний угол)
-    final fpsCounter = FpsCounterComponent(
-      position: Vector2(targetResolution.width - 80, 30),
-      anchor: Anchor.topRight,
-    );
+//   void _centerCameraOnPlayer() {
+//     // Центрируем камеру на игроке
+//     final playerPos = gameWorld.player.position;
+//     mainCamera.viewfinder.position = playerPos;
+//   }
 
-    // Мини-карта (левый нижний угол)
-    final minimap = MinimapComponent(
-      position: Vector2(20, targetResolution.height - 20),
-      size: Vector2(200, 200),
-      world: gameWorld,
-      camera: mainCamera,
-    );
+//   void _setupHUD() {
+//     debugPrint('🎨 Настройка HUD...');
 
-    // Добавляем HUD на вьюпорт
-    mainCamera.viewport.addAll([fpsCounter, minimap]);
-  }
+//     // FPS счетчик (правый верхний угол)
+//     final fpsCounter = FpsCounterComponent(
+//       position: Vector2(targetResolution.width - 80, 30),
+//       anchor: Anchor.topRight,
+//     );
 
-  @override
-  void update(double dt) {
-    if (!_isInitialized) return;
+//     // Мини-карта (левый нижний угол)
+//     final minimap = MinimapComponent(
+//       position: Vector2(20, targetResolution.height - 20),
+//       size: Vector2(200, 200),
+//       world: gameWorld,
+//       camera: mainCamera,
+//     );
 
-    super.update(dt);
+//     // Добавляем HUD на вьюпорт
+//     mainCamera.viewport.addAll([fpsCounter, minimap]);
+//   }
 
-    // Обновляем систему спавна
-    gameWorld.updateSpawners(dt);
+//   @override
+//   void update(double dt) {
+//     if (!_isInitialized) return;
 
-    // Обновляем HUD элементы
-    _updateHUD();
-  }
+//     super.update(dt);
 
-  void _updateHUD() {
-    // Обновляем позицию игрока на мини-карте (автоматически через перерисовку)
-    // Можно добавить дополнительную логику для динамических элементов
-  }
+//     // Обновляем систему спавна
+//     gameWorld.updateSpawners(dt);
 
-  @override
-  void render(Canvas canvas) {
-    if (!_isInitialized) return;
-    super.render(canvas);
-  }
+//     // Обновляем HUD элементы
+//     _updateHUD();
+//   }
 
-  @override
-  KeyEventResult onKeyEvent(
-    KeyEvent event,
-    Set<LogicalKeyboardKey> keysPressed,
-  ) {
-    if (!_isInitialized) return KeyEventResult.ignored;
+//   void _updateHUD() {
+//     // Обновляем позицию игрока на мини-карте (автоматически через перерисовку)
+//     // Можно добавить дополнительную логику для динамических элементов
+//   }
 
-    // Обработка специальных клавиш
-    if (event is KeyDownEvent) {
-      _handleSpecialKeys(event.logicalKey);
-    }
+//   @override
+//   void render(Canvas canvas) {
+//     if (!_isInitialized) return;
+//     super.render(canvas);
+//   }
 
-    inputManager.handleKeyEvent(event);
-    return KeyEventResult.handled;
-  }
+//   @override
+//   KeyEventResult onKeyEvent(
+//     KeyEvent event,
+//     Set<LogicalKeyboardKey> keysPressed,
+//   ) {
+//     if (!_isInitialized) return KeyEventResult.ignored;
 
-  void _handleSpecialKeys(LogicalKeyboardKey key) {
-    // Камера: возврат к игроку по пробелу
-    if (key == LogicalKeyboardKey.space) {
-      _centerCameraOnPlayer();
-    }
+//     // Обработка специальных клавиш
+//     if (event is KeyDownEvent) {
+//       _handleSpecialKeys(event.logicalKey);
+//     }
 
-    // Зум камеры: + и -
-    if (key == LogicalKeyboardKey.equal ||
-        key == LogicalKeyboardKey.numpadAdd) {
-      zoomCamera(mainCamera.viewfinder.zoom + 0.1);
-    }
-    if (key == LogicalKeyboardKey.minus ||
-        key == LogicalKeyboardKey.numpadSubtract) {
-      zoomCamera(mainCamera.viewfinder.zoom - 0.1);
-    }
+//     inputManager.handleKeyEvent(event);
+//     return KeyEventResult.handled;
+//   }
 
-    // Сброс зума
-    if (key == LogicalKeyboardKey.digit0 || key == LogicalKeyboardKey.numpad0) {
-      zoomCamera(defaultZoom);
-    }
-  }
+//   void _handleSpecialKeys(LogicalKeyboardKey key) {
+//     // Камера: возврат к игроку по пробелу
+//     if (key == LogicalKeyboardKey.space) {
+//       _centerCameraOnPlayer();
+//     }
 
-  void zoomCamera(double newZoom) {
-    final clampedZoom = newZoom.clamp(minZoom, maxZoom);
-    mainCamera.viewfinder.zoom = clampedZoom;
+//     // Зум камеры: + и -
+//     if (key == LogicalKeyboardKey.equal ||
+//         key == LogicalKeyboardKey.numpadAdd) {
+//       zoomCamera(mainCamera.viewfinder.zoom + 0.1);
+//     }
+//     if (key == LogicalKeyboardKey.minus ||
+//         key == LogicalKeyboardKey.numpadSubtract) {
+//       zoomCamera(mainCamera.viewfinder.zoom - 0.1);
+//     }
 
-    // Обновляем границы после изменения зума
-    _setupCameraBounds();
-  }
+//     // Сброс зума
+//     if (key == LogicalKeyboardKey.digit0 || key == LogicalKeyboardKey.numpad0) {
+//       zoomCamera(defaultZoom);
+//     }
+//   }
 
-  // Публичные методы для управления игрой
-  void pauseGame() {
-    paused = true;
-    debugPrint('⏸️ Игра на паузе');
-  }
+//   void zoomCamera(double newZoom) {
+//     final clampedZoom = newZoom.clamp(minZoom, maxZoom);
+//     mainCamera.viewfinder.zoom = clampedZoom;
 
-  void resumeGame() {
-    paused = false;
-    debugPrint('▶️ Игра продолжена');
-  }
+//     // Обновляем границы после изменения зума
+//     _setupCameraBounds();
+//   }
 
-  void resetGame() {
-    if (!_isInitialized) return;
+//   // Публичные методы для управления игрой
+//   void pauseGame() {
+//     paused = true;
+//     debugPrint('⏸️ Игра на паузе');
+//   }
 
-    debugPrint('🔄 Сброс игры...');
+//   void resumeGame() {
+//     paused = false;
+//     debugPrint('▶️ Игра продолжена');
+//   }
 
-    // Сбрасываем ввод
-    inputManager.reset();
+//   void resetGame() {
+//     if (!_isInitialized) return;
 
-    // Возвращаем игрока на стартовую позицию
-    gameWorld.player.position = Vector2(
-      gameWorld.mapWidth / 2,
-      gameWorld.mapHeight / 2,
-    );
-    gameWorld.player.health = gameWorld.player.maxHealth;
-    gameWorld.player.energy = gameWorld.player.maxEnergy;
+//     debugPrint('🔄 Сброс игры...');
 
-    // Центрируем камеру
-    _centerCameraOnPlayer();
+//     // Сбрасываем ввод
+//     inputManager.reset();
 
-    debugPrint('✅ Игра сброшена');
-  }
+//     // Возвращаем игрока на стартовую позицию
+//     gameWorld.player.position = Vector2(
+//       gameWorld.mapWidth / 2,
+//       gameWorld.mapHeight / 2,
+//     );
+//     gameWorld.player.health = gameWorld.player.maxHealth;
+//     gameWorld.player.energy = gameWorld.player.maxEnergy;
 
-  // Эффекты камеры
-  void shakeCamera({double intensity = 10.0, double duration = 0.3}) {
-    final shakeEffect = MoveEffect.by(
-      Vector2(
-        (DateTime.now().millisecondsSinceEpoch % 20 - 10).toDouble() *
-            intensity /
-            10,
-        (DateTime.now().millisecondsSinceEpoch % 20 - 10).toDouble() *
-            intensity /
-            10,
-      ),
-      EffectController(duration: duration, infinite: true),
-    );
-    mainCamera.viewfinder.add(shakeEffect);
-  }
+//     // Центрируем камеру
+//     _centerCameraOnPlayer();
 
-  void smoothZoomTo(double targetZoom, {double duration = 0.5}) {
-    final currentZoom = mainCamera.viewfinder.zoom;
-    final clampedTarget = targetZoom.clamp(minZoom, maxZoom);
+//     debugPrint('✅ Игра сброшена');
+//   }
 
-    mainCamera.viewfinder.add(
-      ScaleEffect.to(
-        Vector2.all(clampedTarget),
-        EffectController(duration: duration, curve: Curves.easeInOut),
-      ),
-    );
+//   // Эффекты камеры
+//   void shakeCamera({double intensity = 10.0, double duration = 0.3}) {
+//     final shakeEffect = MoveEffect.by(
+//       Vector2(
+//         (DateTime.now().millisecondsSinceEpoch % 20 - 10).toDouble() *
+//             intensity /
+//             10,
+//         (DateTime.now().millisecondsSinceEpoch % 20 - 10).toDouble() *
+//             intensity /
+//             10,
+//       ),
+//       EffectController(duration: duration, infinite: true),
+//     );
+//     mainCamera.viewfinder.add(shakeEffect);
+//   }
 
-    // Обновляем границы после завершения анимации
-    Future.delayed(Duration(milliseconds: (duration * 1000).toInt()), () {
-      _setupCameraBounds();
-    });
-  }
+//   void smoothZoomTo(double targetZoom, {double duration = 0.5}) {
+//     final currentZoom = mainCamera.viewfinder.zoom;
+//     final clampedTarget = targetZoom.clamp(minZoom, maxZoom);
 
-  // Геттеры для внешнего доступа
-  bool get isGameReady => _isInitialized;
-  Vector2 get playerPosition => gameWorld.player.position;
-  double get playerHealth => gameWorld.player.health;
-  double get playerEnergy => gameWorld.player.energy;
-}
+//     mainCamera.viewfinder.add(
+//       ScaleEffect.to(
+//         Vector2.all(clampedTarget),
+//         EffectController(duration: duration, curve: Curves.easeInOut),
+//       ),
+//     );
+
+//     // Обновляем границы после завершения анимации
+//     Future.delayed(Duration(milliseconds: (duration * 1000).toInt()), () {
+//       _setupCameraBounds();
+//     });
+//   }
+
+//   // Геттеры для внешнего доступа
+//   bool get isGameReady => _isInitialized;
+//   Vector2 get playerPosition => gameWorld.player.position;
+//   double get playerHealth => gameWorld.player.health;
+//   double get playerEnergy => gameWorld.player.energy;
+// }

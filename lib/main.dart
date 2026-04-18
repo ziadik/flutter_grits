@@ -7,7 +7,9 @@ import 'package:flame_tiled/flame_tiled.dart' hide Text;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart' hide Animation, Image, Text;
-import 'package:flutter_grits/flame_game/game/grits_game2.dart';
+import 'package:flutter_grits/flame_game/game/grits_game.dart';
+import 'package:flutter_grits/flame_game/game/world/game_world.dart';
+import 'package:flutter_grits/flame_game/managers/resource_manager.dart';
 
 // void main() {
 //   runApp(GameWidget(game: TiledGame()));
@@ -15,7 +17,7 @@ import 'package:flutter_grits/flame_game/game/grits_game2.dart';
 
 // class TiledGame extends FlameGame {
 //   late TiledComponent mapComponent;
-
+//   late GameWorld gameWorld;
 //   TiledGame()
 //     : super(
 //         //camera: CameraComponent.withFixedResolution(width: 2048, height: 2048),
@@ -66,13 +68,17 @@ import 'package:flutter_grits/flame_game/game/grits_game2.dart';
 // import 'package:flutter/services.dart';
 // import 'package:flutter_grits/flame_game/game/grits_game.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  ResourceManager resourceManager = ResourceManager();
+  await resourceManager.loadResources();
   // Запускаем игру в полноэкранном режиме
-  runApp(const GameApp());
+  runApp(GameApp(resourceManager: resourceManager));
 }
 
 class GameApp extends StatelessWidget {
-  const GameApp({super.key});
+  final ResourceManager resourceManager;
+  const GameApp({super.key, required this.resourceManager});
 
   @override
   Widget build(BuildContext context) {
@@ -84,7 +90,7 @@ class GameApp extends StatelessWidget {
         body: Container(
           color: Colors.black,
           child: GameWidget(
-            game: GritsGame(),
+            game: GritsGame(resourceManager: resourceManager),
             // Опционально: добавляем overlay для паузы
             // overlayBuilderMap: {
             //   'PauseMenu': (context, game) =>

@@ -4,12 +4,12 @@ import 'dart:ui';
 import 'package:flutter/services.dart';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_grits/flame_game/player/player_animator.dart'; // Исправлен импорт
+import 'package:flutter_grits/flame_game/models/player_animator.dart'; // Исправлен импорт
 
 class ResourceManager {
   late PlayerAnimator playerAnimator;
   late Image _effectsImage;
-  late Image _tilesetImage;
+  // late Image _tilesetImage;
   bool _isLoaded = false;
 
   Future<void> loadResources() async {
@@ -26,17 +26,17 @@ class ResourceManager {
       final effectsImageData = await rootBundle.load(
         'assets/grits_effects.png',
       );
-      final tilesetImageData = await rootBundle.load(
-        'assets/images/grits_master.png',
-      );
+      // final tilesetImageData = await rootBundle.load(
+      //   'assets/images/grits_master.png',
+      // );
 
       // Загрузка изображений
       _effectsImage = await _loadImageFromBytes(
         effectsImageData.buffer.asUint8List(),
       );
-      _tilesetImage = await _loadImageFromBytes(
-        tilesetImageData.buffer.asUint8List(),
-      );
+      // _tilesetImage = await _loadImageFromBytes(
+      //   tilesetImageData.buffer.asUint8List(),
+      // );
 
       // Инициализация аниматора
       playerAnimator = PlayerAnimator();
@@ -57,6 +57,6 @@ class ResourceManager {
   }
 
   Image get effectsImage => _effectsImage;
-  Image get tilesetImage => _tilesetImage;
+  // Image get tilesetImage => _tilesetImage;
   bool get isLoaded => _isLoaded;
 }

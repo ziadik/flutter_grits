@@ -13,50 +13,75 @@ import 'package:flutter_grits/flame_game/components/hud/fps_counter.dart';
 import 'package:flutter_grits/flame_game/components/hud/minimap.dart';
 import 'package:flame/effects.dart';
 
-class TiledGame extends FlameGame {
-  late TiledComponent mapComponent;
+class GritsGame extends FlameGame with KeyboardEvents {
+  final ResourceManager resourceManager;
+  late InputManager inputManager;
+  late GameWorld gameWorld; // Явно храним ссылку на GameWorld
 
-  TiledGame()
-    : super(
-        //camera: CameraComponent.withFixedResolution(width: 2048, height: 2048),
-      );
+  GritsGame({required this.resourceManager}) : super();
 
   @override
   Future<void> onLoad() async {
-    mapComponent = await TiledComponent.load('map1.tmx', Vector2.all(64));
-    mapComponent.scale = Vector2.all(1);
+    // Создаем менеджер ввода
+    inputManager = InputManager();
 
-    await world.add(mapComponent);
+    // Создаем игровой мир
+    gameWorld = GameWorld(
+      resourceManager: resourceManager,
+      inputManager: inputManager,
+    );
 
-    _centerCameraOnMap(Vector2(800.0, 800.0));
+    // Устанавливаем мир
+    world = gameWorld;
+
+    // Настраиваем камеру после загрузки мира
+    await _setupCamera();
   }
 
-  Future<void> _centerCameraOnMap(Vector2 gameSize) async {
-    final mapWidth = mapComponent.size.x;
-    final mapHeight = mapComponent.size.y;
+  Future<void> _setupCamera() async {
+    // Ждем загрузки мира
+    await gameWorld.onLoad();
 
-    // camera = CameraComponent.withFixedResolution(
-    //   world: world,
-    //   width: mapWidth,
-    //   height: mapHeight,
-    // );
-    // camera.viewfinder.anchor = Anchor.topLeft;
-
-    final viewWidth = gameSize.x;
-    final viewHeight = gameSize.y;
-
+    // Создаем камеру с фиксированным размером вьюпорта
     camera = CameraComponent(
-      world: world,
-      viewport: FixedSizeViewport(viewWidth, viewHeight),
+      viewport: FixedSizeViewport(800, 800),
+      world: gameWorld,
     );
-    camera.viewfinder.position = Vector2(mapWidth / 2, mapHeight / 2);
-    camera.viewfinder.anchor = Anchor.center;
+
+    // Настраиваем следование за игроком
+    camera.follow(gameWorld.player);
+
+    // Добавляем камеру в игру
+    await add(camera);
   }
 
   @override
   void onGameResize(Vector2 newSize) {
     super.onGameResize(newSize);
-    _centerCameraOnMap(newSize); // Пересчитываем при изменении
+
+    // Обновляем размер вьюпорта если камера уже создана
+    if (camera != null && camera.viewport is FixedSizeViewport) {
+      (camera.viewport as FixedSizeViewport).size = newSize;
+    }
+  }
+
+  @override
+  KeyEventResult onKeyEvent(
+    KeyEvent event,
+    Set<LogicalKeyboardKey> keysPressed,
+  ) {
+    inputManager.handleKeyEvent(event);
+    return KeyEventResult.handled;
+  }
+
+  @override
+  void update(double dt) {
+    super.update(dt);
+
+    // Обновляем систему спавна
+    if (gameWorld != null) {
+      gameWorld.updateSpawners(dt);
+    }
   }
 }
 
