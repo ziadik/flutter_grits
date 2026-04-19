@@ -7,6 +7,7 @@ import 'package:flutter_grits/flame_game/managers/input_manager.dart';
 import 'package:flutter_grits/flame_game/components/health_bar_component.dart';
 import 'package:flutter_grits/flame_game/components/energy_bar_component.dart';
 import 'package:flutter_grits/flame_game/models/player_animator.dart';
+import 'package:flutter_grits/flame_game/weapons/weapon_base.dart';
 import 'dart:ui' as ui;
 
 class TrimmedSpriteAnimationComponent extends PositionComponent {
@@ -145,22 +146,30 @@ class Player extends PositionComponent {
   // Движение
   int _currLegAnimIndex = 2; // 2 = down
   bool walking = false;
-  final double _walkSpeed = 200.0;
+  double _walkSpeed = 200.0; // Было final, теперь изменяемое для Thrusters
   double faceAngleRadians = 0;
+
+  // Анимации (загружаются из ResourceManager)
+  final List<List<TrimmedSprite>?> _walkAnimations = [null, null, null, null];
+  final List<List<TrimmedSprite>?> _idleAnimations = [null, null, null, null];
 
   // Компоненты для отрисовки
   late TrimmedSpriteAnimationComponent _legsComponent;
   late TrimmedSpriteAnimationComponent _legsMaskComponent;
   late SpriteComponent _turretComponent;
+  late PositionComponent _weaponComponent; // Отображение текущего оружия
 
   // UI компоненты
   late HealthBarComponent _healthBar;
   late EnergyBarComponent _energyBar;
   late TextComponent _nameLabel;
 
-  // Хранилище анимаций для каждого направления
-  final Map<int, List<TrimmedSprite>> _walkAnimations = {};
-  final Map<int, List<TrimmedSprite>> _idleAnimations = {};
+  // Оружие (3 слота как в JS коде) - опционально, не ломает существующую логику
+  final List<WeaponBase?> _weapons = [null, null, null];
+  int _selectedWeaponSlot = 0; // По умолчанию слот 0
+  bool _isFiringWeapon0 = false;
+  bool _isFiringWeapon1 = false;
+  bool _isFiringWeapon2 = false;
 
   static const double playerSize = 128.0;
 
@@ -198,6 +207,13 @@ class Player extends PositionComponent {
       anchor: Anchor.center,
     );
 
+    // Оружие
+    _weaponComponent = PositionComponent(
+      size: Vector2(playerSize, playerSize),
+      position: Vector2(-20, -20),
+      anchor: Anchor.center,
+    );
+
     // UI компоненты
     _healthBar = HealthBarComponent(
       position: Vector2(0, -playerSize / 2 - 10),
@@ -228,13 +244,15 @@ class Player extends PositionComponent {
     await addAll([
       _legsComponent,
       _legsMaskComponent,
-      _turretComponent,
+      // _turretComponent,
+      _weaponComponent,
       _healthBar,
       _energyBar,
       _nameLabel,
     ]);
 
     await _loadTurretSprite();
+    await _loadWeaponSprite();
   }
 
   Future<void> _loadTurretSprite() async {
@@ -257,6 +275,61 @@ class Player extends PositionComponent {
       );
       _turretComponent.sprite = Sprite(image);
     }
+  }
+
+  Future<void> _loadWeaponSprite() async {
+    // Загрузка спрайта оружия будет обновляться при смене оружия
+    // _weaponComponent.removeAll(_weaponComponent.children.toList());
+  }
+
+  /// Обновить отображение оружия (вызывать при смене оружия)
+  Future<void> updateWeaponSprite() async {
+    debugPrint('=== updateWeaponSprite() called ===');
+
+    final weapon = selectedWeapon;
+    if (weapon == null) {
+      debugPrint('No weapon selected, clearing weapon component');
+      _weaponComponent.removeAll(_weaponComponent.children.toList());
+      return;
+    }
+
+    debugPrint('Weapon: ${weapon.displayName}');
+    debugPrint('Sprite name: ${weapon.weaponSpriteName}');
+
+    final animator = resourceManager.playerAnimator;
+    debugPrint('Animator loaded: ${animator.isLoaded}');
+
+    final weaponSprite = animator.getSprite(weapon.weaponSpriteName);
+
+    if (weaponSprite == null) {
+      debugPrint('❌ Weapon sprite NOT FOUND: ${weapon.weaponSpriteName}');
+      debugPrint(
+        'Available sprites: ${animator.sprites.keys.take(10).toList()}',
+      );
+      return;
+    }
+
+    debugPrint('✅ Weapon sprite found!');
+    debugPrint('Sprite size: ${weaponSprite.sprite.srcSize}');
+
+    // Удаляем старый компонент
+    _weaponComponent.removeAll(_weaponComponent.children.toList());
+
+    // Создаем новый SpriteComponent с загруженным спрайтом
+    final weaponSpriteComponent = SpriteComponent(
+      size: Vector2(128, 128),
+      anchor: Anchor.center,
+    );
+
+    final pictureRecorder = ui.PictureRecorder();
+    final canvas = Canvas(pictureRecorder);
+    weaponSprite.renderCentered(canvas, Vector2.zero(), Size(128, 128), null);
+    final picture = pictureRecorder.endRecording();
+    final image = await picture.toImage(128, 128);
+    weaponSpriteComponent.sprite = Sprite(image);
+
+    _weaponComponent.add(weaponSpriteComponent);
+    debugPrint('✅ Weapon sprite added successfully');
   }
 
   Future<void> _loadAnimations() async {
@@ -412,14 +485,123 @@ class Player extends PositionComponent {
     _energyBar.updateEnergy(energy, maxEnergy);
   }
 
+  // Getter для _walkSpeed
+  double get walkSpeed => _walkSpeed;
+
+  /// Установить скорость ходьбы (для Thrusters)
+  void setWalkSpeed(double newSpeed) {
+    // Сохраняем ограничение
+    _walkSpeed = newSpeed.clamp(100.0, 500.0);
+  }
+
+  // ========== Методы для работы с оружием ==========
+
+  /// Установить оружие в слот
+  void setWeapon(int slot, WeaponBase? weapon) {
+    if (slot < 0 || slot >= _weapons.length) {
+      throw ArgumentError('Slot must be 0, 1, or 2');
+    }
+    _weapons[slot] = weapon;
+    weapon?.onInit(this);
+
+    // Если это текущий выбранный слот, обновить отображение
+    if (slot == _selectedWeaponSlot) {
+      updateWeaponSprite();
+    }
+  }
+
+  /// Переключить оружие на указанный слот
+  void selectWeapon(int slot) {
+    if (slot < 0 || slot >= _weapons.length) {
+      debugPrint('Invalid weapon slot: $slot');
+      return;
+    }
+    _selectedWeaponSlot = slot;
+    debugPrint(
+      'Selected weapon slot: $slot - ${_weapons[slot]?.displayName ?? "Empty"}',
+    );
+
+    // Обновить отображение оружия
+    updateWeaponSprite();
+  }
+
+  /// Получить оружие из слота
+  WeaponBase? getWeapon(int slot) {
+    if (slot < 0 || slot >= _weapons.length) return null;
+    return _weapons[slot];
+  }
+
+  /// Начать стрельбу из оружия в слоте
+  void startFiring(int slot) {
+    if (slot == 0) _isFiringWeapon0 = true;
+    if (slot == 1) _isFiringWeapon1 = true;
+    if (slot == 2) _isFiringWeapon2 = true;
+    _updateFiringState(slot);
+  }
+
+  /// Прекратить стрельбу из оружия в слоте
+  void stopFiring(int slot) {
+    if (slot == 0) _isFiringWeapon0 = false;
+    if (slot == 1) _isFiringWeapon1 = false;
+    if (slot == 2) _isFiringWeapon2 = false;
+  }
+
+  /// Обновить состояние стрельбы для оружия
+  void _updateFiringState(int slot) {
+    final weapon = _weapons[slot];
+    if (weapon == null) return;
+
+    final isFiring = slot == 0
+        ? _isFiringWeapon0
+        : slot == 1
+        ? _isFiringWeapon1
+        : _isFiringWeapon2;
+
+    if (isFiring) {
+      weapon.tryFire(this);
+    } else {
+      weapon.firing = false;
+    }
+  }
+
+  /// Добавить снаряд в игровой мир (вызывается из WeaponBase)
+  void addToWorld(PositionComponent component) {
+    // Находим родительский компонент (GameWorld) и добавляем снаряд
+    final parent = findParent<PositionComponent>();
+    if (parent != null) {
+      parent.add(component);
+    }
+  }
+
+  // Свойства для активации особых оружий
+  bool isShieldActive = false;
+  bool isSwordActive = false;
+  bool isThrustersActive = false;
+
+  /// Получить текущий выбранный слот оружия
+  int get selectedWeaponSlot => _selectedWeaponSlot;
+
+  /// Получить текущее выбранное оружие
+  WeaponBase? get selectedWeapon => _weapons[_selectedWeaponSlot];
+
   @override
   void update(double dt) {
     super.update(dt);
 
     if (!isDead) {
       updateMovement(dt);
+
+      // Обновляем все оружия
+      for (int i = 0; i < _weapons.length; i++) {
+        final weapon = _weapons[i];
+        if (weapon != null) {
+          weapon.onUpdate(this, dt);
+          _updateFiringState(i);
+        }
+      }
     }
 
+    // Восстановление энергии
     if (energy < maxEnergy) {
       energy = (energy + 20 * dt).clamp(0, maxEnergy);
       _energyBar.updateEnergy(energy, maxEnergy);

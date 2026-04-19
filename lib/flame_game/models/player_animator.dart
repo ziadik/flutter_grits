@@ -78,6 +78,9 @@ class PlayerAnimator {
   bool _loaded = false;
   late Image _effectsImage;
 
+  // Getter для отладки
+  Map<String, TrimmedSprite> get sprites => _sprites;
+
   void loadImages(Image effectsImage) {
     _effectsImage = effectsImage;
   }
@@ -179,6 +182,20 @@ class PlayerAnimator {
 
   TrimmedSprite? getTurretSprite() {
     return _sprites['turret_player_color.png'];
+  }
+
+  /// Получить спрайт по имени
+  TrimmedSprite? getSprite(String name) {
+    return _sprites[name];
+  }
+
+  /// Получить все спрайты по паттерну (регулярное выражение)
+  List<TrimmedSprite> getSpritesByPattern(String pattern) {
+    final regex = RegExp(pattern);
+    return _sprites.entries
+        .where((entry) => regex.hasMatch(entry.key))
+        .map((entry) => entry.value)
+        .toList();
   }
 
   bool get isLoaded => _loaded;

@@ -11,6 +11,7 @@ import 'package:flutter_grits/flame_game/managers/resource_manager.dart';
 import 'package:flutter_grits/flame_game/game/world/game_world.dart';
 import 'package:flutter_grits/flame_game/components/hud/fps_counter.dart';
 import 'package:flutter_grits/flame_game/components/hud/minimap.dart';
+import 'package:flutter_grits/flame_game/components/hud/weapon_indicator.dart';
 import 'package:flame/effects.dart';
 
 class GritsGame extends FlameGame with KeyboardEvents {
@@ -51,8 +52,51 @@ class GritsGame extends FlameGame with KeyboardEvents {
     // Настраиваем следование за игроком
     camera.follow(gameWorld.player);
 
+    // Добавляем HUD элементы на вьюпорт (не двигаются с миром!)
+    _setupHUD();
+
     // Добавляем камеру в игру
     await add(camera);
+  }
+
+  void _setupHUD() {
+    // FPS счетчик в правом верхнем углу
+    final fpsCounter = FpsCounterComponent(
+      position: Vector2(750, 30),
+      anchor: Anchor.topRight,
+    );
+    camera.viewport.add(fpsCounter);
+
+    // Мини-карта в левом нижнем углу
+    final minimap = MinimapComponent(
+      position: Vector2(20, 750),
+      size: Vector2(180, 180),
+      world: gameWorld,
+      camera: camera,
+    );
+    camera.viewport.add(minimap);
+
+    // Индикатор оружия в левом верхнем углу
+    // Ждем немного пока игрок загрузится
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (gameWorld.player.isLoaded) {
+        _addWeaponIndicator();
+      } else {
+        // Если игрок еще не готов, пробуем позже
+        gameWorld.player.onLoad().then((_) => _addWeaponIndicator());
+      }
+    });
+  }
+
+  void _addWeaponIndicator() {
+    // Индикатор оружия
+    WeaponIndicatorComponent.create(
+      player: gameWorld.player,
+      position: Vector2(20, 20),
+    ).then((indicator) {
+      camera.viewport.add(indicator);
+      debugPrint('✅ Weapon indicator added to HUD');
+    });
   }
 
   @override
@@ -81,6 +125,20 @@ class GritsGame extends FlameGame with KeyboardEvents {
     // Обновляем систему спавна
     if (gameWorld != null) {
       gameWorld.updateSpawners(dt);
+
+      // Обработка переключения оружия
+      _handleWeaponSwitching();
+    }
+
+    // Обновляем InputManager (для очистки justPressedKeys)
+    inputManager.update(dt);
+  }
+
+  /// Обработка переключения оружия клавишами 1, 2, 3
+  void _handleWeaponSwitching() {
+    final slot = inputManager.getWeaponSlotKeyPress();
+    if (slot != null && gameWorld.player != null) {
+      gameWorld.player.selectWeapon(slot);
     }
   }
 }

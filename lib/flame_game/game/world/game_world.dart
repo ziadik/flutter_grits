@@ -7,6 +7,7 @@ import 'package:flutter_grits/flame_game/managers/resource_manager.dart';
 import 'package:flutter_grits/flame_game/managers/input_manager.dart';
 import 'package:flutter_grits/flame_game/systems/spawn_system.dart';
 import 'package:flutter_grits/flame_game/components/environment_component.dart';
+import 'package:flutter_grits/flame_game/weapons/weapon_registry.dart';
 import 'package:flutter/foundation.dart';
 
 class GameWorld extends World {
@@ -29,6 +30,14 @@ class GameWorld extends World {
   Future<void> onLoad() async {
     await _loadMap();
     await _createPlayer();
+
+    // Установка оружия для игрока
+    _setupPlayerWeapons();
+
+    // Ждем пока игрок полностью загрузится, затем обновим оружие
+    await Future.delayed(const Duration(milliseconds: 100));
+    player.updateWeaponSprite();
+
     _initSpawnSystem();
     _loadEnvironmentObjects();
   }
@@ -63,6 +72,23 @@ class GameWorld extends World {
 
   void _initSpawnSystem() {
     spawnSystem = SpawnSystem();
+  }
+
+  /// Установка оружия для игрока
+  void _setupPlayerWeapons() {
+    // Регистрация всех оружий
+    WeaponRegistry.register();
+
+    // Слот 1: Основное оружие (MachineGun)
+    player.setWeapon(0, WeaponRegistry.createWeapon('MachineGun'));
+
+    // Слот 2: Вторичное оружие (ShotGun)
+    player.setWeapon(1, WeaponRegistry.createWeapon('ShotGun'));
+
+    // Слот 3: Особое оружие (RocketLauncher)
+    player.setWeapon(2, WeaponRegistry.createWeapon('RocketLauncher'));
+
+    debugPrint('Weapons set: MachineGun, ShotGun, RocketLauncher');
   }
 
   void _loadEnvironmentObjects() {
