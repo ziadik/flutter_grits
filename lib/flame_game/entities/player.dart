@@ -1,5 +1,8 @@
 // lib/entities/player.dart
+import 'dart:ui' as ui;
+import 'package:flame/collisions.dart';
 import 'package:flame/components.dart';
+import 'package:flame/text.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_grits/flame_game/managers/resource_manager.dart';
@@ -8,7 +11,7 @@ import 'package:flutter_grits/flame_game/components/health_bar_component.dart';
 import 'package:flutter_grits/flame_game/components/energy_bar_component.dart';
 import 'package:flutter_grits/flame_game/models/player_animator.dart';
 import 'package:flutter_grits/flame_game/weapons/weapon_base.dart';
-import 'dart:ui' as ui;
+import 'package:flutter_grits/flame_game/game/world/game_world.dart';
 
 class TrimmedSpriteAnimationComponent extends PositionComponent {
   List<TrimmedSprite> _frames = [];
@@ -130,7 +133,7 @@ class TrimmedSpriteAnimationComponent extends PositionComponent {
   }
 }
 
-class Player extends PositionComponent {
+class Player extends PositionComponent with HasCollisionDetection {
   final ResourceManager resourceManager;
   InputManager? inputManager;
 
@@ -184,6 +187,15 @@ class Player extends PositionComponent {
     await super.onLoad();
     await _createComponents();
     await _loadAnimations();
+
+    // Добавляем хитбокс для коллизий
+    add(
+      RectangleHitbox(
+        position: Vector2(0, 0),
+        anchor: Anchor.center,
+        size: Vector2(64, 64),
+      ),
+    );
   }
 
   Future<void> _createComponents() async {
@@ -452,11 +464,6 @@ class Player extends PositionComponent {
       _legsMaskComponent.setWalking(walking);
     }
 
-    if (walking) {
-      final movement = moveDir * _walkSpeed * dt;
-      position += movement;
-    }
-
     if (inputManager!.mousePosition != null) {
       final directionToAim = inputManager!.mousePosition! - position;
       if (directionToAim.length2 > 0) {
@@ -464,6 +471,47 @@ class Player extends PositionComponent {
         _turretComponent.angle = -1.0 * 3.14159 + faceAngleRadians;
       }
     }
+  }
+
+  /// Метод для движения с проверкой коллизий
+  void move(Vector2 direction, double dt) {
+    if (direction == Vector2.zero()) return;
+
+    final movement = direction.normalized() * _walkSpeed * dt;
+    final newPosition = position + movement;
+
+    // Проверка коллизий с миром
+    final gameWorld = findParent<GameWorld>();
+    if (gameWorld != null) {
+      final collidable = gameWorld.isCollidable(newPosition);
+      debugPrint('Move check: newPos=($newPosition), collidable=$collidable');
+
+      if (!collidable) {
+        position = newPosition;
+      } else {
+        debugPrint('🚫 COLLISION! Position blocked');
+      }
+    } else {
+      position = newPosition;
+    }
+  }
+
+  @override
+  void render(Canvas canvas) {
+    super.render(canvas);
+
+    // Визуализация хитбокса (только если включен отладочный режим)
+    final halfSize = 32.0;
+    canvas.drawRect(
+      Rect.fromLTWH(-halfSize, -halfSize, 64, 64),
+      Paint()
+        ..color = Colors.red.withOpacity(0.3)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2,
+    );
+
+    // Точка центра
+    canvas.drawCircle(Offset.zero, 3, Paint()..color = Colors.yellow);
   }
 
   void takeDamage(double amount) {

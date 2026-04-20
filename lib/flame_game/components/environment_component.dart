@@ -1,11 +1,13 @@
 // lib/components/environment_component.dart
 import 'dart:math' as math;
+import 'package:flame/collisions.dart';
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
 
 enum EnvironmentType { spawner, spawnPoint, pickup }
 
-class EnvironmentComponent extends PositionComponent {
+class EnvironmentComponent extends PositionComponent
+    with HasCollisionDetection {
   final EnvironmentType type;
   final String name;
   final Map<String, dynamic> properties;
@@ -18,7 +20,16 @@ class EnvironmentComponent extends PositionComponent {
     required this.name,
     required this.properties,
     this.effectsImage,
-  });
+  }) {
+    // Добавляем хитбокс для коллизий
+    add(
+      RectangleHitbox(
+        position: Vector2(size.x / 2, size.y / 2),
+        anchor: Anchor.center,
+        size: size,
+      ),
+    );
+  }
 
   @override
   void render(Canvas canvas) {

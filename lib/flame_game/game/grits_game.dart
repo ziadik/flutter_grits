@@ -1,5 +1,6 @@
 // lib/game/grits_game.dart
 import 'package:flame/camera.dart';
+import 'package:flame/collisions.dart';
 import 'package:flame/components.dart';
 import 'package:flame/game.dart';
 import 'package:flame/input.dart';
@@ -12,12 +13,15 @@ import 'package:flutter_grits/flame_game/game/world/game_world.dart';
 import 'package:flutter_grits/flame_game/components/hud/fps_counter.dart';
 import 'package:flutter_grits/flame_game/components/hud/minimap.dart';
 import 'package:flutter_grits/flame_game/components/hud/weapon_indicator.dart';
+import 'package:flutter_grits/flame_game/components/debug/collision_debug_overlay.dart';
 import 'package:flame/effects.dart';
 
-class GritsGame extends FlameGame with KeyboardEvents {
+class GritsGame extends FlameGame with HasCollisionDetection, KeyboardEvents {
   final ResourceManager resourceManager;
   late InputManager inputManager;
-  late GameWorld gameWorld; // Явно храним ссылку на GameWorld
+  late GameWorld gameWorld;
+  CollisionDebugOverlay? _collisionDebugOverlay;
+  bool _debugModeEnabled = false;
 
   GritsGame({required this.resourceManager}) : super();
 
@@ -32,16 +36,33 @@ class GritsGame extends FlameGame with KeyboardEvents {
       inputManager: inputManager,
     );
 
-    // Устанавливаем мир
-    world = gameWorld;
+    // Добавляем мир вручную (не через world)
+    await add(gameWorld);
 
-    // Настраиваем камеру после загрузки мира
+    // Ждем пока игрок будет готов (с таймаутом)
+    await _waitForPlayer();
+
+    // После загрузки настраиваем камеру
     await _setupCamera();
   }
 
+  Future<void> _waitForPlayer() async {
+    // Ждем пока игрок будет доступен (макс 3 секунды)
+    int attempts = 0;
+    while (attempts < 30) {
+      if (gameWorld.player.isLoaded) {
+        return;
+      }
+      await Future.delayed(const Duration(milliseconds: 100));
+      attempts++;
+    }
+  }
+
   Future<void> _setupCamera() async {
-    // Ждем загрузки мира
-    await gameWorld.onLoad();
+    // Проверяем что игрок загружен
+    if (!gameWorld.player.isLoaded) {
+      await gameWorld.player.onLoad();
+    }
 
     // Создаем камеру с фиксированным размером вьюпорта
     camera = CameraComponent(
@@ -52,11 +73,11 @@ class GritsGame extends FlameGame with KeyboardEvents {
     // Настраиваем следование за игроком
     camera.follow(gameWorld.player);
 
-    // Добавляем HUD элементы на вьюпорт (не двигаются с миром!)
-    _setupHUD();
-
     // Добавляем камеру в игру
     await add(camera);
+
+    // Настраиваем HUD после добавления камеры
+    _setupHUD();
   }
 
   void _setupHUD() {
@@ -114,8 +135,42 @@ class GritsGame extends FlameGame with KeyboardEvents {
     KeyEvent event,
     Set<LogicalKeyboardKey> keysPressed,
   ) {
+    // Обработка F1 - переключение отладочного оверлея
+    if (event is KeyDownEvent && keysPressed.contains(LogicalKeyboardKey.f1)) {
+      _toggleDebugOverlay();
+      return KeyEventResult.handled;
+    }
+
+    // Передаем остальные события в InputManager
     inputManager.handleKeyEvent(event);
     return KeyEventResult.handled;
+  }
+
+  void _toggleDebugOverlay() {
+    _debugModeEnabled = !_debugModeEnabled;
+
+    if (_debugModeEnabled) {
+      if (_collisionDebugOverlay == null) {
+        _collisionDebugOverlay = CollisionDebugOverlay(
+          gameWorld: gameWorld,
+          showPlayerBounds: true,
+          showCollisionTiles: true,
+          showInteractiveItems: true,
+        );
+      }
+
+      // Добавляем оверлей В МИР, а не на камеру
+      if (!gameWorld.children.contains(_collisionDebugOverlay)) {
+        gameWorld.add(_collisionDebugOverlay!);
+        debugPrint('🔍 Отладочный режим: ВКЛЮЧЕН');
+      }
+    } else {
+      // Удаляем оверлей
+      if (_collisionDebugOverlay != null) {
+        _collisionDebugOverlay?.removeFromParent();
+        debugPrint('❌ Отладочный режим: ВЫКЛЮЧЕН');
+      }
+    }
   }
 
   @override
