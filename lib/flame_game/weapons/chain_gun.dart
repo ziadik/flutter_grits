@@ -1,8 +1,10 @@
 // lib/flame_game/weapons/chain_gun.dart
+import 'package:flame/components.dart';
 import 'package:flutter_grits/flame_game/weapons/weapon_base.dart';
 import 'package:flutter_grits/flame_game/projectiles/bullet.dart';
 import 'package:flutter_grits/flame_game/entities/player.dart';
 import 'package:flutter_grits/flame_game/managers/sound_manager.dart';
+import 'package:vector_math/vector_math.dart';
 
 /// Пулемет (ChainGun)
 ///
@@ -65,6 +67,9 @@ class ChainGun extends WeaponBase {
 
     // Добавить пулю в игровой мир
     addProjectileToWorld(bullet);
+
+    // Создать muzzle flash для chain gun (позиция дула: x=35, y=-3)
+    createMuzzleFlash(player, Vector2(35, -3));
 
     // Воспроизвести звук выстрела
     SoundManager().playShootSound(SoundAssets.machineShoot0);

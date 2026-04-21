@@ -16,6 +16,7 @@ import 'package:flutter_grits/flame_game/components/hud/minimap.dart';
 import 'package:flutter_grits/flame_game/components/hud/weapon_indicator.dart';
 import 'package:flutter_grits/flame_game/components/debug/collision_debug_overlay.dart';
 import 'package:flame/effects.dart';
+import 'package:flutter_grits/flame_game/components/crosshair.dart';
 
 class GritsGame extends FlameGame with HasCollisionDetection, KeyboardEvents {
   final ResourceManager resourceManager;
@@ -24,7 +25,12 @@ class GritsGame extends FlameGame with HasCollisionDetection, KeyboardEvents {
   CollisionDebugOverlay? _collisionDebugOverlay;
   bool _debugModeEnabled = false;
 
-  GritsGame({required this.resourceManager}) : super();
+  late Vector2 _mouseWorldPosition;
+  late CrosshairComponent _crosshair;
+
+  GritsGame({required this.resourceManager}) : super() {
+    _mouseWorldPosition = Vector2.zero();
+  }
 
   @override
   Future<void> onLoad() async {
@@ -45,6 +51,10 @@ class GritsGame extends FlameGame with HasCollisionDetection, KeyboardEvents {
 
     // После загрузки настраиваем камеру
     await _setupCamera();
+
+    // Создаем прицел
+    _crosshair = CrosshairComponent();
+    camera.viewport.add(_crosshair);
   }
 
   Future<void> _waitForPlayer() async {
@@ -177,6 +187,14 @@ class GritsGame extends FlameGame with HasCollisionDetection, KeyboardEvents {
     }
   }
 
+  /// Обработка переключения оружия клавишами 1, 2, 3
+  void _handleWeaponSwitching() {
+    final slot = inputManager.getWeaponSlotKeyPress();
+    if (slot != null && gameWorld.player != null) {
+      gameWorld.player.selectWeapon(slot);
+    }
+  }
+
   @override
   void update(double dt) {
     super.update(dt);
@@ -191,14 +209,6 @@ class GritsGame extends FlameGame with HasCollisionDetection, KeyboardEvents {
 
     // Обновляем InputManager (для очистки justPressedKeys)
     inputManager.update(dt);
-  }
-
-  /// Обработка переключения оружия клавишами 1, 2, 3
-  void _handleWeaponSwitching() {
-    final slot = inputManager.getWeaponSlotKeyPress();
-    if (slot != null && gameWorld.player != null) {
-      gameWorld.player.selectWeapon(slot);
-    }
   }
 }
 

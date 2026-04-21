@@ -5,6 +5,7 @@ import 'package:flutter_grits/flame_game/weapons/weapon_base.dart';
 import 'package:flutter_grits/flame_game/projectiles/bullet.dart';
 import 'package:flutter_grits/flame_game/entities/player.dart';
 import 'package:flutter_grits/flame_game/managers/sound_manager.dart';
+import 'package:vector_math/vector_math.dart';
 
 /// Дробовик (ShotGun)
 ///
@@ -73,6 +74,9 @@ class ShotGun extends WeaponBase {
 
       addProjectileToWorld(bullet);
     }
+
+    // Создаем muzzle flash для дробовика (позиция дула: x=38, y=-4)
+    createMuzzleFlash(player, Vector2(38, -4));
 
     // Воспроизводим звук выстрела
     SoundManager().playShootSound(SoundAssets.shotgunShoot0);

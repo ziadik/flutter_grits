@@ -1,8 +1,10 @@
 // lib/flame_game/weapons/machine_gun.dart
+import 'package:flame/components.dart';
 import 'package:flutter_grits/flame_game/weapons/weapon_base.dart';
 import 'package:flutter_grits/flame_game/projectiles/bullet.dart';
 import 'package:flutter_grits/flame_game/entities/player.dart';
 import 'package:flutter_grits/flame_game/managers/sound_manager.dart';
+import 'package:flutter/foundation.dart';
 
 /// Машинное оружие (Machine Gun)
 ///
@@ -46,6 +48,8 @@ class MachineGun extends WeaponBase {
 
   @override
   void onFire(Player player) {
+    debugPrint('🔫 MachineGun firing!');
+
     // Получить направление стрельбы
     final direction = getFireDirection(player);
 
@@ -65,6 +69,9 @@ class MachineGun extends WeaponBase {
 
     // Добавить пулю в игровой мир
     addProjectileToWorld(bullet);
+
+    // Создать muzzle flash (позиция дула: x=38, y=-4)
+    createMuzzleFlash(player, Vector2(38, -4));
 
     // Воспроизвести звук выстрела
     SoundManager().playShootSound(SoundAssets.machineShoot0);

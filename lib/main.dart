@@ -4,6 +4,8 @@ import 'package:flutter/widgets.dart' hide Animation, Image, Text;
 import 'package:flutter_grits/flame_game/game/grits_game.dart';
 import 'package:flutter_grits/flame_game/managers/resource_manager.dart';
 import 'package:flutter_grits/flame_game/managers/sound_manager.dart';
+import 'package:flutter/foundation.dart';
+import 'dart:ui' as ui;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,6 +34,8 @@ class GameApp extends StatelessWidget {
           color: Colors.black,
           child: GameWidget(
             game: GritsGame(resourceManager: resourceManager),
+            autofocus: true,
+            mouseCursor: MouseCursor.uncontrolled,
             // Опционально: добавляем overlay для паузы
             // overlayBuilderMap: {
             //   'PauseMenu': (context, game) =>

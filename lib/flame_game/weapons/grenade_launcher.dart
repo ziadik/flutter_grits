@@ -1,8 +1,10 @@
 // lib/flame_game/weapons/grenade_launcher.dart
+import 'package:flame/components.dart';
 import 'package:flutter_grits/flame_game/weapons/weapon_base.dart';
 import 'package:flutter_grits/flame_game/projectiles/bullet.dart';
 import 'package:flutter_grits/flame_game/entities/player.dart';
 import 'package:flutter_grits/flame_game/managers/sound_manager.dart';
+import 'package:vector_math/vector_math.dart';
 
 /// Гранатомет (GrenadeLauncher)
 ///
@@ -65,6 +67,9 @@ class GrenadeLauncher extends WeaponBase {
 
     // Добавить гранату в игровой мир
     addProjectileToWorld(grenade);
+
+    // Создать muzzle flash для гранатомета (позиция дула: x=40, y=-5)
+    createMuzzleFlash(player, Vector2(40, -5));
 
     // Воспроизвести звук выстрела
     SoundManager().playShootSound(SoundAssets.grenadeShoot0);

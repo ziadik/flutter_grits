@@ -650,10 +650,16 @@ class Player extends PositionComponent with HasCollisionDetection {
 
   /// Добавить снаряд в игровой мир (вызывается из WeaponBase)
   void addToWorld(PositionComponent component) {
+    debugPrint('addToWorld called for: ${component.runtimeType}');
     // Находим родительский компонент (GameWorld) и добавляем снаряд
     final parent = findParent<PositionComponent>();
     if (parent != null) {
       parent.add(component);
+      debugPrint(
+        '✅ Component added to parent at position: ${component.position}',
+      );
+    } else {
+      debugPrint('❌ Parent not found!');
     }
   }
 
@@ -675,12 +681,14 @@ class Player extends PositionComponent with HasCollisionDetection {
     if (!isDead) {
       updateMovement(dt);
 
+      // Обработка стрельбы из текущего оружия
+      _handleFiring();
+
       // Обновляем все оружия
       for (int i = 0; i < _weapons.length; i++) {
         final weapon = _weapons[i];
         if (weapon != null) {
           weapon.onUpdate(this, dt);
-          _updateFiringState(i);
         }
       }
     }
@@ -689,6 +697,28 @@ class Player extends PositionComponent with HasCollisionDetection {
     if (energy < maxEnergy) {
       energy = (energy + 20 * dt).clamp(0, maxEnergy);
       _energyBar.updateEnergy(energy, maxEnergy);
+    }
+  }
+
+  /// Обработка стрельбы из текущего оружия
+  void _handleFiring() {
+    if (inputManager == null) return;
+
+    final isShooting =
+        inputManager!.isLeftMousePressed || inputManager!.isSpacePressed;
+    final currentWeapon = selectedWeapon;
+
+    if (isShooting) {
+      debugPrint(
+        '🎯 Shooting! Weapon: ${currentWeapon?.displayName ?? "None"}',
+      );
+      debugPrint('   Mouse pressed: ${inputManager!.isLeftMousePressed}');
+      debugPrint('   Space pressed: ${inputManager!.isSpacePressed}');
+    }
+
+    if (currentWeapon != null && isShooting) {
+      debugPrint('🔥 Calling tryFire for ${currentWeapon.displayName}');
+      currentWeapon.tryFire(this);
     }
   }
 }

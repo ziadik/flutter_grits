@@ -15,6 +15,11 @@ class InputManager {
   bool _mousePressed = false;
   bool _useMouseMovement = false;
 
+  // Для стрельбы
+  bool _isLeftMousePressed = false;
+  bool _isRightMousePressed = false;
+  bool _isMiddleMousePressed = false;
+
   // Настройки
   bool keyboardEnabled = true;
   bool mouseMovementEnabled = true;
@@ -59,6 +64,14 @@ class InputManager {
 
   Vector2? get mousePosition => _mousePosition;
 
+  // Геттеры для состояния кнопок мыши
+  bool get isLeftMousePressed => _isLeftMousePressed;
+  bool get isRightMousePressed => _isRightMousePressed;
+  bool get isMiddleMousePressed => _isMiddleMousePressed;
+
+  // Геттер для пробела
+  bool get isSpacePressed => _pressedKeys.contains(LogicalKeyboardKey.space);
+
   void handleKeyEvent(KeyEvent event) {
     if (event is KeyDownEvent) {
       _pressedKeys.add(event.logicalKey);
@@ -76,12 +89,39 @@ class InputManager {
     _mousePressed = true;
     _targetPosition = position;
     _useMouseMovement = true;
+    _isLeftMousePressed = true;
+  }
+
+  void handleMouseButtonPress(int button) {
+    if (button == 1) {
+      // Левая кнопка
+      _isLeftMousePressed = true;
+    } else if (button == 2) {
+      // Правая кнопка
+      _isRightMousePressed = true;
+    } else if (button == 3) {
+      // Средняя кнопка
+      _isMiddleMousePressed = true;
+    }
   }
 
   void handleMouseRelease() {
     _mousePressed = false;
     _targetPosition = null;
     _useMouseMovement = false;
+    _isLeftMousePressed = false;
+    _isRightMousePressed = false;
+    _isMiddleMousePressed = false;
+  }
+
+  void handleMouseButtonRelease(int button) {
+    if (button == 1) {
+      _isLeftMousePressed = false;
+    } else if (button == 2) {
+      _isRightMousePressed = false;
+    } else if (button == 3) {
+      _isMiddleMousePressed = false;
+    }
   }
 
   void handleMouseDrag(Vector2 position) {

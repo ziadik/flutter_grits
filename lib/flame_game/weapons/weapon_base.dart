@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_grits/flame_game/entities/player.dart';
+import 'package:flutter_grits/flame_game/effects/muzzle_flash.dart';
 
 /// Абстрактный базовый класс для всех видов оружия.
 ///
@@ -106,6 +107,56 @@ abstract class WeaponBase {
   /// Добавить снаряд в игровой мир
   void addProjectileToWorld(ProjectileBase projectile) {
     _owningPlayer?.addToWorld(projectile);
+  }
+
+  /// Создать эффект вспышки выстрела (muzzle flash)
+  void createMuzzleFlash(Player player, Vector2 offset) {
+    if (muzzleSpritePattern.isEmpty) {
+      // Fallback - простой muzzle flash без спрайтов
+      createSimpleMuzzleFlash(player, offset);
+      return;
+    }
+
+    final animator = player.resourceManager.playerAnimator;
+
+    // Получаем все спрайты для muzzle flash по паттерну
+    final muzzleSprites = animator.getSpritesByPattern(
+      '${muzzleSpritePattern}.*\\.png',
+    );
+
+    if (muzzleSprites.isEmpty) {
+      // Если спрайты не найдены, используем простой fallback
+      createSimpleMuzzleFlash(player, offset);
+      return;
+    }
+
+    // Вычисляем позицию muzzle flash относительно игрока
+    final direction = getFireDirection(player);
+    final muzzlePos =
+        player.position +
+        direction * offset.x +
+        Vector2(-direction.y, direction.x) * offset.y;
+
+    final muzzle = MuzzleFlash(
+      position: muzzlePos,
+      frames: muzzleSprites,
+      frameDuration: 0.05,
+      size: Vector2(64, 64),
+    );
+
+    player.addToWorld(muzzle);
+  }
+
+  /// Простой muzzle flash без спрайтов (fallback)
+  void createSimpleMuzzleFlash(Player player, Vector2 offset) {
+    final direction = getFireDirection(player);
+    final muzzlePos =
+        player.position +
+        direction * offset.x +
+        Vector2(-direction.y, direction.x) * offset.y;
+
+    final flash = SimpleMuzzleFlash(position: muzzlePos);
+    player.addToWorld(flash);
   }
 }
 

@@ -1,8 +1,10 @@
 // lib/flame_game/weapons/rocket_launcher.dart
+import 'package:flame/components.dart';
 import 'package:flutter_grits/flame_game/weapons/weapon_base.dart';
 import 'package:flutter_grits/flame_game/projectiles/bullet.dart';
 import 'package:flutter_grits/flame_game/entities/player.dart';
 import 'package:flutter_grits/flame_game/managers/sound_manager.dart';
+import 'package:vector_math/vector_math.dart';
 
 /// Ракетница (RocketLauncher)
 ///
@@ -65,6 +67,9 @@ class RocketLauncher extends WeaponBase {
 
     // Добавить ракету в игровой мир
     addProjectileToWorld(rocket);
+
+    // Создать muzzle flash для ракетницы (позиция дула: x=42, y=-6)
+    createMuzzleFlash(player, Vector2(42, -6));
 
     // Воспроизвести звук выстрела
     SoundManager().playShootSound(SoundAssets.rocketShoot0);
