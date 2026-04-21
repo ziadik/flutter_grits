@@ -199,10 +199,9 @@ class Player extends PositionComponent with HasCollisionDetection {
   }
 
   Future<void> _createComponents() async {
-    // Ноги
+    // Ноги - без смещения, центр игрока
     _legsComponent = TrimmedSpriteAnimationComponent(
       size: Vector2(playerSize, playerSize),
-
       anchor: Anchor.center,
     );
 
@@ -212,17 +211,17 @@ class Player extends PositionComponent with HasCollisionDetection {
       anchor: Anchor.center,
     );
 
-    // Турель
+    // Турель - тоже по центру (убираем смещение)
     _turretComponent = SpriteComponent(
       size: Vector2(playerSize, playerSize),
-      position: Vector2(-20, -20),
+      position: Vector2.zero(),
       anchor: Anchor.center,
     );
 
-    // Оружие
+    // Оружие - тоже по центру
     _weaponComponent = PositionComponent(
       size: Vector2(playerSize, playerSize),
-      position: Vector2(-20, -20),
+      position: Vector2.zero(),
       anchor: Anchor.center,
     );
 
@@ -256,7 +255,7 @@ class Player extends PositionComponent with HasCollisionDetection {
     await addAll([
       _legsComponent,
       _legsMaskComponent,
-      // _turretComponent,
+      _turretComponent,
       _weaponComponent,
       _healthBar,
       _energyBar,
@@ -323,21 +322,47 @@ class Player extends PositionComponent with HasCollisionDetection {
 
     debugPrint('✅ Weapon sprite found!');
     debugPrint('Sprite size: ${weaponSprite.sprite.srcSize}');
+    debugPrint('Using playerSize: $playerSize (128x128)');
+
+    // Отладка размеров спрайта
+    debugPrint('=== SPRITE DEBUG ===');
+    debugPrint('Sprite name: ${weapon.weaponSpriteName}');
+    debugPrint(
+      'Raw sprite size: ${weaponSprite.sprite.srcSize.x}x${weaponSprite.sprite.srcSize.y}',
+    );
+    debugPrint('Trimmed: ${weaponSprite.trimmed}');
+    if (weaponSprite.trimmed) {
+      debugPrint(
+        'Trimmed size: ${weaponSprite.spriteSourceSize.width}x${weaponSprite.spriteSourceSize.height}',
+      );
+      debugPrint(
+        'Source size: ${weaponSprite.sourceSize.width}x${weaponSprite.sourceSize.height}',
+      );
+      debugPrint(
+        'Frame position: ${weaponSprite.frame.left},${weaponSprite.frame.top}',
+      );
+    }
 
     // Удаляем старый компонент
     _weaponComponent.removeAll(_weaponComponent.children.toList());
 
-    // Создаем новый SpriteComponent с загруженным спрайтом
+    // Создаем SpriteComponent с правильными размерами
     final weaponSpriteComponent = SpriteComponent(
-      size: Vector2(128, 128),
+      size: Vector2(playerSize, playerSize),
       anchor: Anchor.center,
+      position: Vector2.zero(),
     );
 
     final pictureRecorder = ui.PictureRecorder();
     final canvas = Canvas(pictureRecorder);
-    weaponSprite.renderCentered(canvas, Vector2.zero(), Size(128, 128), null);
+    weaponSprite.renderCentered(
+      canvas,
+      Vector2.zero(),
+      Size(playerSize, playerSize),
+      null,
+    );
     final picture = pictureRecorder.endRecording();
-    final image = await picture.toImage(128, 128);
+    final image = await picture.toImage(playerSize.toInt(), playerSize.toInt());
     weaponSpriteComponent.sprite = Sprite(image);
 
     _weaponComponent.add(weaponSpriteComponent);
@@ -468,7 +493,8 @@ class Player extends PositionComponent with HasCollisionDetection {
       final directionToAim = inputManager!.mousePosition! - position;
       if (directionToAim.length2 > 0) {
         faceAngleRadians = directionToAim.angleToSigned(Vector2(0, -1));
-        _turretComponent.angle = -1.0 * 3.14159 + faceAngleRadians;
+        // Исправлен угол поворота турели - убрана лишняя константа
+        _turretComponent.angle = faceAngleRadians;
       }
     }
   }
@@ -500,18 +526,28 @@ class Player extends PositionComponent with HasCollisionDetection {
   void render(Canvas canvas) {
     super.render(canvas);
 
-    // Визуализация хитбокса (только если включен отладочный режим)
-    final halfSize = 32.0;
+    // Визуализация хитбокса (зеленым, чтобы было видно)
+    final halfSize = 32.0; // Размер хитбокса 64x64
     canvas.drawRect(
       Rect.fromLTWH(-halfSize, -halfSize, 64, 64),
       Paint()
-        ..color = Colors.red.withOpacity(0.3)
+        ..color = Colors.green.withOpacity(0.5)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2,
     );
 
     // Точка центра
-    canvas.drawCircle(Offset.zero, 3, Paint()..color = Colors.yellow);
+    canvas.drawCircle(Offset.zero, 4, Paint()..color = Colors.yellow);
+
+    // Визуализация размера спрайта (128x128) - красным
+    final spriteHalfSize = 64.0;
+    canvas.drawRect(
+      Rect.fromLTWH(-spriteHalfSize, -spriteHalfSize, 128, 128),
+      Paint()
+        ..color = Colors.red.withOpacity(0.3)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1,
+    );
   }
 
   void takeDamage(double amount) {

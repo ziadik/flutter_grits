@@ -27,44 +27,35 @@ class TrimmedSprite {
     Size targetSize,
     Paint? paint,
   ) {
+    // Размеры для отрисовки (оригинальный размер спрайта)
+    final drawWidth = trimmed ? spriteSourceSize.width : sprite.srcSize.x;
+    final drawHeight = trimmed ? spriteSourceSize.height : sprite.srcSize.y;
+
+    // Центрируем внутри targetSize
+    final offsetX = (targetSize.width - drawWidth) / 2;
+    final offsetY = (targetSize.height - drawHeight) / 2;
+
     if (trimmed) {
-      // Вычисляем центр целевого контейнера
-      final centerX = position.x + targetSize.width / 2;
-      final centerY = position.y + targetSize.height / 2;
-
-      // Оригинальный центр изображения (64, 64 для 128x128)
-      final originalCenterX = sourceSize.width / 2;
-      final originalCenterY = sourceSize.height / 2;
-
-      // Смещение обрезанного спрайта относительно оригинального центра
-      final offsetX = originalCenterX - spriteSourceSize.left;
-      final offsetY = originalCenterY - spriteSourceSize.top;
-
-      // Финальная позиция для отрисовки (центрируем)
-      final finalX = centerX - (spriteSourceSize.width / 2) - offsetX;
-      final finalY = centerY - (spriteSourceSize.height / 2) - offsetY;
-
-      // Рисуем спрайт в ОРИГИНАЛЬНОМ размере (не растягиваем!)
-      sprite.render(
-        canvas,
-        position: Vector2(finalX, finalY),
-        size: Vector2(spriteSourceSize.width, spriteSourceSize.height),
-        overridePaint: paint,
+      // Для обрезанных спрайтов используем drawImageRect
+      final srcRect = Rect.fromLTWH(
+        frame.left,
+        frame.top,
+        drawWidth,
+        drawHeight,
       );
+      final destRect = Rect.fromLTWH(
+        position.x + offsetX,
+        position.y + offsetY,
+        drawWidth,
+        drawHeight,
+      );
+      canvas.drawImageRect(sprite.image, srcRect, destRect, paint ?? Paint());
     } else {
-      // Если не обрезано, тоже не растягиваем, а центрируем
-      final centerX = position.x + targetSize.width / 2;
-      final centerY = position.y + targetSize.height / 2;
-      final spriteWidth = sprite.srcSize.x;
-      final spriteHeight = sprite.srcSize.y;
-
-      final finalX = centerX - (spriteWidth / 2);
-      final finalY = centerY - (spriteHeight / 2);
-
+      // Для необрезанных используем sprite.render
       sprite.render(
         canvas,
-        position: Vector2(finalX, finalY),
-        size: Vector2(spriteWidth, spriteHeight),
+        position: Vector2(position.x + offsetX, position.y + offsetY),
+        size: Vector2(drawWidth, drawHeight),
         overridePaint: paint,
       );
     }
