@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_grits/flame_game/managers/input_manager.dart';
 import 'package:flutter_grits/flame_game/managers/resource_manager.dart';
+import 'package:flutter_grits/flame_game/managers/sound_manager.dart';
 import 'package:flutter_grits/flame_game/game/world/game_world.dart';
 import 'package:flutter_grits/flame_game/components/hud/fps_counter.dart';
 import 'package:flutter_grits/flame_game/components/hud/minimap.dart';
@@ -78,6 +79,9 @@ class GritsGame extends FlameGame with HasCollisionDetection, KeyboardEvents {
 
     // Настраиваем HUD после добавления камеры
     _setupHUD();
+
+    // Запускаем фоновую музыку
+    await SoundManager().playBackgroundMusic(SoundAssets.bgGame);
   }
 
   void _setupHUD() {

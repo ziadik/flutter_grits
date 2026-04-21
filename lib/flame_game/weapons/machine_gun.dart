@@ -2,6 +2,7 @@
 import 'package:flutter_grits/flame_game/weapons/weapon_base.dart';
 import 'package:flutter_grits/flame_game/projectiles/bullet.dart';
 import 'package:flutter_grits/flame_game/entities/player.dart';
+import 'package:flutter_grits/flame_game/managers/sound_manager.dart';
 
 /// Машинное оружие (Machine Gun)
 ///
@@ -65,7 +66,7 @@ class MachineGun extends WeaponBase {
     // Добавить пулю в игровой мир
     addProjectileToWorld(bullet);
 
-    // TODO: Воспроизвести звук выстрела
-    // SoundManager.play('machine_shoot0.ogg');
+    // Воспроизвести звук выстрела
+    SoundManager().playShootSound(SoundAssets.machineShoot0);
   }
 }

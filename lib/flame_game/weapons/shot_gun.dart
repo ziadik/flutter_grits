@@ -4,6 +4,7 @@ import 'package:flame/components.dart';
 import 'package:flutter_grits/flame_game/weapons/weapon_base.dart';
 import 'package:flutter_grits/flame_game/projectiles/bullet.dart';
 import 'package:flutter_grits/flame_game/entities/player.dart';
+import 'package:flutter_grits/flame_game/managers/sound_manager.dart';
 
 /// Дробовик (ShotGun)
 ///
@@ -50,6 +51,7 @@ class ShotGun extends WeaponBase {
     const numBullets = 5;
     const spread = 2.0 / numBullets; // Разброс ±1 радиан
 
+    // Добавляем все дробинки в мир
     for (int i = 0; i < numBullets; i++) {
       // Вычисляем угол с разбросом
       final offset = (spread * (i + 1)) - 1; // От -1 до +1 радиан
@@ -72,8 +74,8 @@ class ShotGun extends WeaponBase {
       addProjectileToWorld(bullet);
     }
 
-    // TODO: Звук выстрела
-    // SoundManager.play('shotgun_shoot0.ogg');
+    // Воспроизводим звук выстрела
+    SoundManager().playShootSound(SoundAssets.shotgunShoot0);
   }
 
   // Вспомогательный метод для вращения вектора

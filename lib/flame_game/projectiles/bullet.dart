@@ -2,6 +2,7 @@
 import 'package:flame/components.dart';
 import 'package:flutter_grits/flame_game/weapons/weapon_base.dart';
 import 'package:flutter_grits/flame_game/entities/player.dart';
+import 'package:flutter_grits/flame_game/managers/sound_manager.dart';
 
 /// Базовая пуля для MachineGun, ChainGun и других скорострельных оружий.
 ///
@@ -32,12 +33,8 @@ class Bullet extends ProjectileBase {
       other.takeDamage(damage);
     }
 
-    // TODO: Создать эффект удара
-    // final impactEffect = ImpactEffect(position: collisionPoint);
-    // addProjectileToWorld(impactEffect);
-
-    // TODO: Воспроизвести звук удара
-    // SoundManager.play('bounce0.ogg');
+    // Воспроизвести звук удара/взрыва
+    SoundManager().playSfx(SoundAssets.bounce0);
 
     // Уничтожить пулю
     destroy();

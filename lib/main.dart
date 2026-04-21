@@ -3,9 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart' hide Animation, Image, Text;
 import 'package:flutter_grits/flame_game/game/grits_game.dart';
 import 'package:flutter_grits/flame_game/managers/resource_manager.dart';
+import 'package:flutter_grits/flame_game/managers/sound_manager.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Инициализируем звуковой менеджер
+  await SoundManager().init();
+
   ResourceManager resourceManager = ResourceManager();
   await resourceManager.loadResources();
   // Запускаем игру в полноэкранном режиме

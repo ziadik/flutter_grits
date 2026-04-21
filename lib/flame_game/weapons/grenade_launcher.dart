@@ -2,6 +2,7 @@
 import 'package:flutter_grits/flame_game/weapons/weapon_base.dart';
 import 'package:flutter_grits/flame_game/projectiles/bullet.dart';
 import 'package:flutter_grits/flame_game/entities/player.dart';
+import 'package:flutter_grits/flame_game/managers/sound_manager.dart';
 
 /// Гранатомет (GrenadeLauncher)
 ///
@@ -65,7 +66,7 @@ class GrenadeLauncher extends WeaponBase {
     // Добавить гранату в игровой мир
     addProjectileToWorld(grenade);
 
-    // TODO: Звук выстрела
-    // SoundManager.play('grenade_shoot0.ogg');
+    // Воспроизвести звук выстрела
+    SoundManager().playShootSound(SoundAssets.grenadeShoot0);
   }
 }

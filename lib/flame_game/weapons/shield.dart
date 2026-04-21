@@ -3,6 +3,7 @@ import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_grits/flame_game/weapons/weapon_base.dart';
 import 'package:flutter_grits/flame_game/entities/player.dart';
+import 'package:flutter_grits/flame_game/managers/sound_manager.dart';
 
 /// Защитный щит (Shield)
 ///
@@ -45,6 +46,9 @@ class Shield extends WeaponBase {
   @override
   void onFire(Player player) {
     if (_shieldInstance != null) return;
+
+    // Воспроизвести звук активации щита
+    SoundManager().playSfx(SoundAssets.shieldActivate);
 
     // Создать щит перед игроком
     _shieldInstance = ShieldInstance(owner: player);

@@ -2,6 +2,7 @@
 import 'package:flutter_grits/flame_game/weapons/weapon_base.dart';
 import 'package:flutter_grits/flame_game/projectiles/bullet.dart';
 import 'package:flutter_grits/flame_game/entities/player.dart';
+import 'package:flutter_grits/flame_game/managers/sound_manager.dart';
 
 /// Ракетница (RocketLauncher)
 ///
@@ -65,7 +66,7 @@ class RocketLauncher extends WeaponBase {
     // Добавить ракету в игровой мир
     addProjectileToWorld(rocket);
 
-    // TODO: Звук выстрела
-    // SoundManager.play('rocket_shoot0.ogg');
+    // Воспроизвести звук выстрела
+    SoundManager().playShootSound(SoundAssets.rocketShoot0);
   }
 }

@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_grits/flame_game/entities/player.dart';
 import 'package:flutter_grits/flame_game/managers/resource_manager.dart';
 import 'package:flutter_grits/flame_game/managers/input_manager.dart';
+import 'package:flutter_grits/flame_game/managers/sound_manager.dart';
 import 'package:flutter_grits/flame_game/systems/spawn_system.dart';
 import 'package:flutter_grits/flame_game/components/environment_component.dart';
 import 'package:flutter_grits/flame_game/weapons/weapon_registry.dart';
@@ -317,6 +318,10 @@ class GameWorld extends World with HasCollisionDetection {
   void _spawnItem(Vector2 position, String itemType) {
     // Логика спавна предметов
     debugPrint('Spawning $itemType at $position');
+
+    // Воспроизводим звук спавна
+    SoundManager().playSfx(SoundAssets.spawn0);
+
     // Здесь можно создать компонент предмета и добавить в мир
   }
 

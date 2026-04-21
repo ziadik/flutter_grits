@@ -3,6 +3,7 @@ import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_grits/flame_game/weapons/weapon_base.dart';
 import 'package:flutter_grits/flame_game/entities/player.dart';
+import 'package:flutter_grits/flame_game/managers/sound_manager.dart';
 
 /// Энергетический меч (Sword)
 ///
@@ -45,6 +46,9 @@ class Sword extends WeaponBase {
   @override
   void onFire(Player player) {
     if (_swordInstance != null) return;
+
+    // Воспроизвести звук активации меча
+    SoundManager().playSfx(SoundAssets.swordActivate);
 
     // Создать меч перед игроком
     _swordInstance = SwordInstance(owner: player);
