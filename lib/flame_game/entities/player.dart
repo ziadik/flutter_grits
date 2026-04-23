@@ -492,19 +492,20 @@ class Player extends PositionComponent with HasCollisionDetection {
       _legsMaskComponent.setWalking(walking);
     }
 
+    // ✅ Всегда обновляем угол турели и оружия на основе мыши
     if (inputManager!.mousePosition != null) {
       final directionToAim = inputManager!.mousePosition! - position;
-      if (directionToAim.length2 > 0) {
+      if (directionToAim.length2 > 0.001) {
         faceAngleRadians = directionToAim.angleToSigned(Vector2(0, -1));
-        // ✅ Обновляем угол турели
-        _turretComponent.angle = faceAngleRadians;
+      }
 
-        // ✅ Обновляем угол оружия на основе мыши
-        final weaponComponent = _weaponComponent.children.firstOrNull;
-        if (weaponComponent is SpriteComponent) {
-          weaponComponent.angle = faceAngleRadians;
-          debugPrint('🎯 Weapon angle: ${faceAngleRadians * 180 / 3.14159}°');
-        }
+      // Обновляем угол турели
+      _turretComponent.angle = faceAngleRadians;
+
+      // Обновляем угол оружия на основе мыши
+      final weaponComponent = _weaponComponent.children.firstOrNull;
+      if (weaponComponent is SpriteComponent) {
+        weaponComponent.angle = faceAngleRadians;
       }
     }
   }
