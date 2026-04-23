@@ -2,8 +2,10 @@
 import 'dart:math';
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_grits/flame_game/entities/player.dart';
 import 'package:flutter_grits/flame_game/effects/muzzle_flash.dart';
+import 'package:flutter_grits/flame_game/game/world/game_world.dart';
 
 /// Абстрактный базовый класс для всех видов оружия.
 ///
@@ -106,7 +108,25 @@ abstract class WeaponBase {
 
   /// Добавить снаряд в игровой мир
   void addProjectileToWorld(ProjectileBase projectile) {
-    _owningPlayer?.addToWorld(projectile);
+    // Найти GameWorld напрямую через игрока
+    final gameWorld = _owningPlayer?.findParent<GameWorld>();
+    if (gameWorld != null) {
+      gameWorld.add(projectile);
+      debugPrint('✅ Projectile added to GameWorld at ${projectile.position}');
+    } else {
+      debugPrint('❌ GameWorld not found for projectile!');
+    }
+  }
+
+  /// Добавить эффект в игровой мир
+  void addEffectToWorld(PositionComponent effect) {
+    final gameWorld = _owningPlayer?.findParent<GameWorld>();
+    if (gameWorld != null) {
+      gameWorld.add(effect);
+      debugPrint('✅ Effect added to GameWorld');
+    } else {
+      debugPrint('❌ GameWorld not found for effect!');
+    }
   }
 
   /// Создать эффект вспышки выстрела (muzzle flash)
@@ -124,8 +144,13 @@ abstract class WeaponBase {
       '${muzzleSpritePattern}.*\\.png',
     );
 
+    debugPrint(
+      '🔫 Muzzle flash sprites for $displayName: ${muzzleSprites.length}',
+    );
+
     if (muzzleSprites.isEmpty) {
       // Если спрайты не найдены, используем простой fallback
+      debugPrint('⚠️ No muzzle flash sprites found for $displayName');
       createSimpleMuzzleFlash(player, offset);
       return;
     }
@@ -144,7 +169,8 @@ abstract class WeaponBase {
       size: Vector2(64, 64),
     );
 
-    player.addToWorld(muzzle);
+    // Добавляем эффект в мир через addEffectToWorld
+    addEffectToWorld(muzzle);
   }
 
   /// Простой muzzle flash без спрайтов (fallback)
@@ -156,7 +182,7 @@ abstract class WeaponBase {
         Vector2(-direction.y, direction.x) * offset.y;
 
     final flash = SimpleMuzzleFlash(position: muzzlePos);
-    player.addToWorld(flash);
+    addEffectToWorld(flash);
   }
 }
 

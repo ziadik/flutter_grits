@@ -5,50 +5,53 @@ import 'package:flutter/material.dart';
 import 'package:flutter_grits/flame_game/models/player_animator.dart';
 
 /// Компонент вспышки выстрела (muzzle flash)
-class MuzzleFlash extends SpriteComponent {
+class MuzzleFlash extends PositionComponent {
   final List<TrimmedSprite> _frames;
   int _currentFrame = 0;
   double _frameTime = 0;
   final double _frameDuration;
   bool _isPlaying = true;
+  Sprite? _currentSprite;
 
   MuzzleFlash({
     required Vector2 position,
     required List<TrimmedSprite> frames,
-    double frameDuration = 0.05, // 50ms per frame
+    double frameDuration = 0.05,
     Vector2? size,
-  })  : _frames = frames,
-        _frameDuration = frameDuration,
-        super(
-          position: position,
-          size: size ?? Vector2(64, 64),
-          anchor: Anchor.center,
-        );
+  }) : _frames = frames,
+       _frameDuration = frameDuration,
+       super(
+         position: position,
+         size: size ?? Vector2(64, 64),
+         anchor: Anchor.center,
+       );
 
   @override
   Future<void> onLoad() async {
     await super.onLoad();
     if (_frames.isNotEmpty) {
-      _updateSprite();
+      await _updateSprite();
     }
   }
 
-  void _updateSprite() {
-    if (_currentFrame < _frames.length) {
-      final frame = _frames[_currentFrame];
-      final pictureRecorder = ui.PictureRecorder();
-      final canvas = ui.Canvas(pictureRecorder);
-      frame.renderCentered(
-        canvas,
-        Vector2.zero(),
-        Size(size.x, size.y),
-        null,
-      );
-      final picture = pictureRecorder.endRecording();
-      picture.toImage(size.x.toInt(), size.y.toInt()).then((img) {
-        sprite = Sprite(img);
-      });
-    }
+  Future<void> _updateSprite() async {
+    if (_currentFrame >= _frames.length) return;
+
+    final frame = _frames[_currentFrame];
+    final pictureRecorder = ui.PictureRecorder();
+    final canvas = ui.Canvas(pictureRecorder);
+
+    frame.renderCentered(canvas, Vector2.zero(), Size(size.x, size.y), null);
+
+    final picture = pictureRecorder.endRecording();
+    final image = await picture.toImage(size.x.toInt(), size.y.toInt());
+    _currentSprite = Sprite(image);
+  }
+
+  @override
+  void render(Canvas canvas) {
+    super.render(canvas);
+    _currentSprite?.render(canvas, position: Vector2.zero());
   }
 
   @override
@@ -63,7 +66,6 @@ class MuzzleFlash extends SpriteComponent {
       _currentFrame++;
 
       if (_currentFrame >= _frames.length) {
-        // Анимация завершена, удаляем компонент
         removeFromParent();
         return;
       }
