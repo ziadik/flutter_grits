@@ -365,6 +365,9 @@ class Player extends PositionComponent with HasCollisionDetection {
     final image = await picture.toImage(playerSize.toInt(), playerSize.toInt());
     weaponSpriteComponent.sprite = Sprite(image);
 
+    // ✅ Устанавливаем угол поворота оружия
+    weaponSpriteComponent.angle = faceAngleRadians;
+
     _weaponComponent.add(weaponSpriteComponent);
     debugPrint('✅ Weapon sprite added successfully');
   }
@@ -493,8 +496,15 @@ class Player extends PositionComponent with HasCollisionDetection {
       final directionToAim = inputManager!.mousePosition! - position;
       if (directionToAim.length2 > 0) {
         faceAngleRadians = directionToAim.angleToSigned(Vector2(0, -1));
-        // Исправлен угол поворота турели - убрана лишняя константа
+        // ✅ Обновляем угол турели
         _turretComponent.angle = faceAngleRadians;
+
+        // ✅ Обновляем угол оружия на основе мыши
+        final weaponComponent = _weaponComponent.children.firstOrNull;
+        if (weaponComponent is SpriteComponent) {
+          weaponComponent.angle = faceAngleRadians;
+          debugPrint('🎯 Weapon angle: ${faceAngleRadians * 180 / 3.14159}°');
+        }
       }
     }
   }

@@ -2,22 +2,18 @@
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
 
-/// Компонент прицела, отображающийся на экране
 class CrosshairComponent extends PositionComponent {
   CrosshairComponent() {
     size = Vector2(32, 32);
     anchor = Anchor.center;
   }
 
-  /// Обновить позицию прицела на экране
   void updatePosition(Vector2 screenPos) {
     position = screenPos;
   }
 
   @override
   void render(Canvas canvas) {
-    super.render(canvas);
-
     final center = Offset.zero;
     final paint = Paint()
       ..color = Colors.white
