@@ -2,8 +2,15 @@
 import 'package:flame/camera.dart';
 import 'package:flame/components.dart';
 import 'package:flame/game.dart';
-import 'package:flame/events.dart' show KeyboardEvents, PointerMoveCallbacks;
+import 'package:flame/events.dart'
+    show
+        KeyboardEvents,
+        PointerMoveCallbacks,
+        TapCallbacks,
+        TapDownEvent,
+        TapUpEvent;
 import 'package:flame/src/events/messages/pointer_move_event.dart';
+import 'package:flutter/gestures.dart' hide PointerMoveEvent;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart' hide PointerMoveEvent;
 import 'package:flutter_grits/flame_game/managers/input_manager.dart';
@@ -21,6 +28,7 @@ class GritsGame extends FlameGame
         HasCollisionDetection,
         KeyboardEvents,
         // HoverCallbacks,
+        TapCallbacks,
         PointerMoveCallbacks {
   final ResourceManager resourceManager;
   late InputManager inputManager;
@@ -199,20 +207,45 @@ class GritsGame extends FlameGame
     }
   }
 
+  // ==================== ОБРАБОТКА МЫШИ ====================
+
   @override
   void onPointerMove(PointerMoveEvent event) {
-    // Сохраняем экранные координаты
     _lastMouseScreenPos = Vector2(event.localPosition.x, event.localPosition.y);
 
-    // Конвертируем в мировые координаты через камеру
+    // Конвертируем в мировые координаты
     final worldPos = camera.globalToLocal(_lastMouseScreenPos);
 
-    // Обновляем InputManager с мировыми координатами
     inputManager.handleMouseMove(worldPos);
-
-    // Обновляем прицел (экранные координаты)
     _crosshair.updatePosition(_lastMouseScreenPos);
-    //super.onPointerMove(event);
+
+    // debugPrint(
+    //   '🖱️ Mouse move - screen: $_lastMouseScreenPos, world: $worldPos',
+    // );
+  }
+
+  @override
+  void onTapDown(TapDownEvent event) {
+    debugPrint('🖱️ Mouse DOWN - button: ${event.deviceKind}');
+
+    final worldPos = camera.globalToLocal(_lastMouseScreenPos);
+
+    if (event.deviceKind == PointerDeviceKind.mouse) {
+      inputManager.handleMousePress(worldPos);
+      inputManager.handleMouseButtonPress(1);
+      debugPrint('🎯 Left mouse DOWN at world: $worldPos');
+    }
+  }
+
+  @override
+  void onTapUp(TapUpEvent event) {
+    debugPrint('🖱️ Mouse UP - button: ${event.deviceKind}');
+
+    if (event.deviceKind == PointerDeviceKind.mouse) {
+      inputManager.handleMouseRelease();
+      inputManager.handleMouseButtonRelease(1);
+      debugPrint('🎯 Left mouse UP');
+    }
   }
 
   @override

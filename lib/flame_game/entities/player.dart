@@ -1,4 +1,5 @@
 // lib/entities/player.dart
+import 'dart:math';
 import 'dart:ui' as ui;
 import 'package:flame/collisions.dart';
 import 'package:flame/components.dart';
@@ -501,7 +502,9 @@ class Player extends PositionComponent with HasCollisionDetection {
 
       // Обновляем угол турели
       _turretComponent.angle = faceAngleRadians;
-
+      debugPrint(
+        '🎯 Direction: $directionToAim, Angle: ${faceAngleRadians * 180 / 3.14159}°',
+      );
       // Обновляем угол оружия на основе мыши
       final weaponComponent = _weaponComponent.children.firstOrNull;
       if (weaponComponent is SpriteComponent) {
@@ -536,6 +539,21 @@ class Player extends PositionComponent with HasCollisionDetection {
   @override
   void render(Canvas canvas) {
     super.render(canvas);
+
+    // Рисуем линию направления оружия для отладки
+    final center = Offset.zero;
+    final endPoint = Offset(
+      cos(faceAngleRadians) * 50,
+      sin(faceAngleRadians) * 50,
+    );
+
+    canvas.drawLine(
+      center,
+      endPoint,
+      Paint()
+        ..color = Colors.cyan
+        ..strokeWidth = 3,
+    );
 
     // Визуализация хитбокса (зеленым, чтобы было видно)
     final halfSize = 32.0; // Размер хитбокса 64x64
