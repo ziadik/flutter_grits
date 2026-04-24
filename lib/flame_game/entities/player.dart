@@ -497,19 +497,23 @@ class Player extends PositionComponent with HasCollisionDetection {
     if (inputManager!.mousePosition != null) {
       final directionToAim = inputManager!.mousePosition! - position;
       if (directionToAim.length2 > 0.001) {
-        faceAngleRadians = directionToAim.angleToSigned(Vector2(0, -1));
+        // В Flame: угол 0 = вправо (оси X), положительный = против часовой
+        // Используем atan2 для правильного угла
+        faceAngleRadians = atan2(directionToAim.y, directionToAim.x);
       }
 
       // Обновляем угол турели
       _turretComponent.angle = faceAngleRadians;
-      debugPrint(
-        '🎯 Direction: $directionToAim, Angle: ${faceAngleRadians * 180 / 3.14159}°',
-      );
+
       // Обновляем угол оружия на основе мыши
       final weaponComponent = _weaponComponent.children.firstOrNull;
       if (weaponComponent is SpriteComponent) {
         weaponComponent.angle = faceAngleRadians;
       }
+
+      debugPrint(
+        '🎯 Direction: $directionToAim, Angle: ${faceAngleRadians * 180 / 3.14159}°',
+      );
     }
   }
 

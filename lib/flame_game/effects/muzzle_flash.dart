@@ -18,13 +18,16 @@ class MuzzleFlash extends PositionComponent {
     required List<TrimmedSprite> frames,
     double frameDuration = 0.05,
     Vector2? size,
+    double angle = 0,
   }) : _frames = frames,
        _frameDuration = frameDuration,
        super(
          position: position,
          size: size ?? Vector2(64, 64),
          anchor: Anchor.center,
-       );
+       ) {
+    this.angle = angle;
+  }
 
   @override
   Future<void> onLoad() async {

@@ -167,6 +167,7 @@ abstract class WeaponBase {
       frames: muzzleSprites,
       frameDuration: 0.05,
       size: Vector2(64, 64),
+      angle: player.faceAngleRadians,
     );
 
     // Добавляем эффект в мир через addEffectToWorld
