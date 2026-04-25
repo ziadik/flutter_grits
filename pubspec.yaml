@@ -9,6 +9,11 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flame: ^1.37.0
+  flame_tiled: ^3.1.1
+  # flame_tiled_utils: ^1.3.1
+  vector_math: ^2.2.0
+  audioplayers: ^6.6.0
 
 dev_dependencies:
   flutter_test:
@@ -18,9 +23,26 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
-    - assets/
-    - assets/maps/
-    - assets/grits_master.png
-    - assets/grits_effects.png
-    - assets/maps/small_map1.json
     - assets/grits_effects.json
+    - assets/grits_effects.png
+    - assets/images/grits_master.png
+    - assets/tiles/small_map1.tmx
+    - assets/tiles/map1.tmx
+    - assets/grits_master.png
+    - assets/sounds/
+    - assets/sounds/bg_game.ogg
+    - assets/sounds/bg_menu.ogg
+    - assets/sounds/bounce0.ogg
+    - assets/sounds/energy_pickup.ogg
+    - assets/sounds/explode0.ogg
+    - assets/sounds/grenade_shoot0.ogg
+    - assets/sounds/item_pickup0.ogg
+    - assets/sounds/machine_shoot0.ogg
+    - assets/sounds/menu_bump.ogg
+    - assets/sounds/menu_select.ogg
+    - assets/sounds/quad_pickup.ogg
+    - assets/sounds/rocket_shoot0.ogg
+    - assets/sounds/shield_activate.ogg
+    - assets/sounds/shotgun_shoot0.ogg
+    - assets/sounds/spawn0.ogg
+    - assets/sounds/sword_activate.ogg
