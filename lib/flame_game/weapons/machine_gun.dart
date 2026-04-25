@@ -48,18 +48,18 @@ class MachineGun extends WeaponBase {
 
   @override
   void onFire(Player player) {
-    debugPrint('🔫 MachineGun firing!');
-    debugPrint('   Player position: ${player.position}');
-    debugPrint('   Face angle: ${player.faceAngleRadians}');
+    // debugPrint('🔫 MachineGun firing!');
+    // debugPrint('   Player position: ${player.position}');
+    // debugPrint('   Face angle: ${player.faceAngleRadians}');
 
     // Получить направление стрельбы
     final direction = getFireDirection(player);
-    debugPrint('   Fire direction: $direction');
-    debugPrint('   Muzzle pattern: $muzzleSpritePattern');
+    // debugPrint('   Fire direction: $direction');
+    // debugPrint('   Muzzle pattern: $muzzleSpritePattern');
 
     // Получить позицию спавна пули (смещение на 20px вперед)
     final spawnPos = getBulletSpawnOffset(player, 20);
-    debugPrint('   Spawn position: $spawnPos');
+    // debugPrint('   Spawn position: $spawnPos');
 
     // Создать пулю
     final bullet = Bullet(

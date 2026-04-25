@@ -57,13 +57,13 @@ class Bullet extends ProjectileBase {
     final moveVector = direction.normalized() * speed * dt;
     position += moveVector;
 
-    debugPrint(
-      '📍 Bullet update: pos=$position, dir=${direction.normalized()}, speed=$speed',
-    );
+    // debugPrint(
+    //   '📍 Bullet update: pos=$position, dir=${direction.normalized()}, speed=$speed',
+    // );
 
     lifetime -= dt;
     if (lifetime <= 0) {
-      debugPrint('💥 Bullet lifetime expired');
+      // debugPrint('💥 Bullet lifetime expired');
       destroy();
     }
   }

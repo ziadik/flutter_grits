@@ -8,7 +8,7 @@ class CrosshairComponent extends PositionComponent {
     size = Vector2(32, 32);
     anchor = Anchor.center;
     position = Vector2(400, 400);
-    debugPrint('🎯 Crosshair created at position: $position');
+    // debugPrint('🎯 Crosshair created at position: $position');
   }
 
   void updatePosition(Vector2 screenPos) {

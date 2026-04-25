@@ -45,7 +45,7 @@ class ResourceManager {
 
       _isLoaded = true;
     } catch (e) {
-      debugPrint('Error loading resources: $e');
+      // debugPrint('Error loading resources: $e');
       rethrow;
     }
   }

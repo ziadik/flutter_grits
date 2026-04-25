@@ -85,11 +85,11 @@ class InputManager {
     _mousePosition = position;
     // Не обновляем targetPosition автоматически
     // Пусть это делает handleMousePress
-    debugPrint('📍 Mouse moved to: $position');
+    // debugPrint('📍 Mouse moved to: $position');
   }
 
   void handleMousePress(Vector2 position) {
-    debugPrint('🎯 Mouse PRESS at: $position');
+    // debugPrint('🎯 Mouse PRESS at: $position');
     _mousePressed = true;
     _targetPosition = position;
     _useMouseMovement = true;

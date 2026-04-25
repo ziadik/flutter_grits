@@ -112,9 +112,9 @@ abstract class WeaponBase {
     final gameWorld = _owningPlayer?.findParent<GameWorld>();
     if (gameWorld != null) {
       gameWorld.add(projectile);
-      debugPrint('✅ Projectile added to GameWorld at ${projectile.position}');
+      // debugPrint('✅ Projectile added to GameWorld at ${projectile.position}');
     } else {
-      debugPrint('❌ GameWorld not found for projectile!');
+      // debugPrint('❌ GameWorld not found for projectile!');
     }
   }
 
@@ -123,9 +123,9 @@ abstract class WeaponBase {
     final gameWorld = _owningPlayer?.findParent<GameWorld>();
     if (gameWorld != null) {
       gameWorld.add(effect);
-      debugPrint('✅ Effect added to GameWorld');
+      // debugPrint('✅ Effect added to GameWorld');
     } else {
-      debugPrint('❌ GameWorld not found for effect!');
+      // debugPrint('❌ GameWorld not found for effect!');
     }
   }
 
@@ -144,13 +144,13 @@ abstract class WeaponBase {
       '${muzzleSpritePattern}.*\\.png',
     );
 
-    debugPrint(
-      '🔫 Muzzle flash sprites for $displayName: ${muzzleSprites.length}',
-    );
+    // debugPrint(
+    //   '🔫 Muzzle flash sprites for $displayName: ${muzzleSprites.length}',
+    // );
 
     if (muzzleSprites.isEmpty) {
       // Если спрайты не найдены, используем простой fallback
-      debugPrint('⚠️ No muzzle flash sprites found for $displayName');
+      // debugPrint('⚠️ No muzzle flash sprites found for $displayName');
       createSimpleMuzzleFlash(player, offset);
       return;
     }

@@ -36,7 +36,7 @@ class CollisionDebugOverlay extends PositionComponent {
     super.render(canvas);
 
     if (showCollisionTiles) {
-      _renderCollisionTiles(canvas);
+      _renderCollisionBlocks(canvas);
     }
 
     if (showInteractiveItems) {
@@ -93,12 +93,9 @@ class CollisionDebugOverlay extends PositionComponent {
     );
   }
 
-  /// Отрисовка тайлов коллизий
-  void _renderCollisionTiles(Canvas canvas) {
-    if (gameWorld.collisionTiles.isEmpty) return;
-
-    final collisionMap = gameWorld.collisionTiles['collision'];
-    if (collisionMap == null || collisionMap.isEmpty) return;
+  /// Отрисовка коллизионных блоков
+  void _renderCollisionBlocks(Canvas canvas) {
+    if (gameWorld.collisionBlocks.isEmpty) return;
 
     final paint = Paint()
       ..color = Colors.red.withOpacity(0.3)
@@ -109,38 +106,25 @@ class CollisionDebugOverlay extends PositionComponent {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.0;
 
-    const tileSize = 64.0;
-
-    // Проходим по всем тайлам
-    for (var x = 0; x < collisionMap.length; x++) {
-      for (var y = 0; y < collisionMap[x].length; y++) {
-        if (collisionMap[x][y]) {
-          // Этот тайл — коллизия
-          final rect = Rect.fromLTWH(
-            x * tileSize,
-            y * tileSize,
-            tileSize,
-            tileSize,
-          );
-          canvas.drawRect(rect, paint);
-          canvas.drawRect(rect, borderPaint);
-        }
-      }
+    // Проходим по всем коллизионным блокам
+    for (final block in gameWorld.collisionBlocks) {
+      final rect = Rect.fromLTWH(
+        block.position.x,
+        block.position.y,
+        block.size.x,
+        block.size.y,
+      );
+      canvas.drawRect(rect, paint);
+      canvas.drawRect(rect, borderPaint);
     }
 
     // Статистика
-    var collisionCount = 0;
-    for (var x = 0; x < collisionMap.length; x++) {
-      for (var y = 0; y < collisionMap[x].length; y++) {
-        if (collisionMap[x][y]) collisionCount++;
-      }
-    }
+    final count = gameWorld.collisionBlocks.length;
 
     // Рисуем текст статистики
     final textPainter = TextPainter(
       text: TextSpan(
-        text:
-            'Коллизий: $collisionCount/${collisionMap.length * collisionMap[0].length}',
+        text: 'Collision blocks: $count',
         style: const TextStyle(
           color: Colors.white,
           fontSize: 14,

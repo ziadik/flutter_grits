@@ -22,13 +22,13 @@ class EnvironmentComponent extends PositionComponent
     this.effectsImage,
   }) {
     // Добавляем хитбокс для коллизий
-    add(
-      RectangleHitbox(
-        position: Vector2(size.x / 2, size.y / 2),
-        anchor: Anchor.center,
-        size: size,
-      ),
-    );
+    // add(
+    //   RectangleHitbox(
+    //     position: Vector2(size.x / 2, size.y / 2),
+    //     anchor: Anchor.center,
+    //     size: size,
+    //   ),
+    // );
   }
 
   @override

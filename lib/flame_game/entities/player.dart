@@ -134,8 +134,10 @@ class TrimmedSpriteAnimationComponent extends PositionComponent {
   }
 }
 
-class Player extends PositionComponent with HasCollisionDetection {
+class Player extends PositionComponent
+    with HasCollisionDetection, CollisionCallbacks {
   final ResourceManager resourceManager;
+  final GameWorld gameWorld; // Добавляем ссылку на мир
   InputManager? inputManager;
 
   // Статистика
@@ -177,7 +179,11 @@ class Player extends PositionComponent with HasCollisionDetection {
 
   static const double playerSize = 128.0;
 
-  Player({required super.position, required this.resourceManager}) {
+  Player({
+    required super.position,
+    required this.resourceManager,
+    required this.gameWorld,
+  }) {
     width = playerSize;
     height = playerSize;
     anchor = Anchor.center;
@@ -189,14 +195,16 @@ class Player extends PositionComponent with HasCollisionDetection {
     await _createComponents();
     await _loadAnimations();
 
-    // Добавляем хитбокс для коллизий
+    // ✅ Добавляем хитбокс для коллизий
     add(
       RectangleHitbox(
-        position: Vector2(0, 0),
+        position: Vector2.zero(),
         anchor: Anchor.center,
-        size: Vector2(64, 64),
+        size: Vector2(48, 48), // Чуть меньше спрайта для лучшего геймплея
       ),
     );
+
+    debugPrint('✅ Hitbox added to player');
   }
 
   Future<void> _createComponents() async {
@@ -205,13 +213,15 @@ class Player extends PositionComponent with HasCollisionDetection {
       size: Vector2(playerSize, playerSize),
       anchor: Anchor.center,
     );
+    _legsComponent.position = Vector2(64, 64);
 
     // Маска ног
     _legsMaskComponent = TrimmedSpriteAnimationComponent(
       size: Vector2(playerSize, playerSize),
+
       anchor: Anchor.center,
     );
-
+    _legsMaskComponent.position = Vector2(64, 64);
     // Турель - тоже по центру (убираем смещение)
     _turretComponent = SpriteComponent(
       size: Vector2(playerSize, playerSize),
@@ -219,29 +229,29 @@ class Player extends PositionComponent with HasCollisionDetection {
       anchor: Anchor.center,
     );
 
-    // Оружие - тоже по центру
+    // Оружие - PositionComponent для добавления детей (спрайт оружия + muzzle)
     _weaponComponent = PositionComponent(
       size: Vector2(playerSize, playerSize),
-      position: Vector2.zero(),
+      position: Vector2(128, 128), //Vector2.zero(),
       anchor: Anchor.center,
     );
 
     // UI компоненты
     _healthBar = HealthBarComponent(
-      position: Vector2(0, -playerSize / 2 - 10),
+      position: Vector2(playerSize / 2, -10),
       health: health,
       maxHealth: maxHealth,
     );
 
     _energyBar = EnergyBarComponent(
-      position: Vector2(0, -playerSize / 2 - 5),
+      position: Vector2(playerSize / 2, -5),
       energy: energy,
       maxEnergy: maxEnergy,
     );
 
     _nameLabel = TextComponent(
       text: playerName,
-      position: Vector2(0, -playerSize / 2 - 22),
+      position: Vector2(playerSize / 2, -22),
       anchor: Anchor.center,
       textRenderer: TextPaint(
         style: const TextStyle(
@@ -256,7 +266,7 @@ class Player extends PositionComponent with HasCollisionDetection {
     await addAll([
       _legsComponent,
       _legsMaskComponent,
-      _turretComponent,
+      // _turretComponent,
       _weaponComponent,
       _healthBar,
       _energyBar,
@@ -296,53 +306,53 @@ class Player extends PositionComponent with HasCollisionDetection {
 
   /// Обновить отображение оружия (вызывать при смене оружия)
   Future<void> updateWeaponSprite() async {
-    debugPrint('=== updateWeaponSprite() called ===');
+    // debugPrint('=== updateWeaponSprite() called ===');
 
     final weapon = selectedWeapon;
     if (weapon == null) {
-      debugPrint('No weapon selected, clearing weapon component');
+      // debugPrint('No weapon selected, clearing weapon component');
       _weaponComponent.removeAll(_weaponComponent.children.toList());
       return;
     }
 
-    debugPrint('Weapon: ${weapon.displayName}');
-    debugPrint('Sprite name: ${weapon.weaponSpriteName}');
+    // debugPrint('Weapon: ${weapon.displayName}');
+    // debugPrint('Sprite name: ${weapon.weaponSpriteName}');
 
     final animator = resourceManager.playerAnimator;
-    debugPrint('Animator loaded: ${animator.isLoaded}');
+    // debugPrint('Animator loaded: ${animator.isLoaded}');
 
     final weaponSprite = animator.getSprite(weapon.weaponSpriteName);
 
     if (weaponSprite == null) {
-      debugPrint('❌ Weapon sprite NOT FOUND: ${weapon.weaponSpriteName}');
-      debugPrint(
-        'Available sprites: ${animator.sprites.keys.take(10).toList()}',
-      );
+      //   debugPrint('❌ Weapon sprite NOT FOUND: ${weapon.weaponSpriteName}');
+      //   debugPrint(
+      //     'Available sprites: ${animator.sprites.keys.take(10).toList()}',
+      //   );
       return;
     }
 
-    debugPrint('✅ Weapon sprite found!');
-    debugPrint('Sprite size: ${weaponSprite.sprite.srcSize}');
-    debugPrint('Using playerSize: $playerSize (128x128)');
+    // debugPrint('✅ Weapon sprite found!');
+    // debugPrint('Sprite size: ${weaponSprite.sprite.srcSize}');
+    // debugPrint('Using playerSize: $playerSize (128x128)');
 
     // Отладка размеров спрайта
-    debugPrint('=== SPRITE DEBUG ===');
-    debugPrint('Sprite name: ${weapon.weaponSpriteName}');
-    debugPrint(
-      'Raw sprite size: ${weaponSprite.sprite.srcSize.x}x${weaponSprite.sprite.srcSize.y}',
-    );
-    debugPrint('Trimmed: ${weaponSprite.trimmed}');
-    if (weaponSprite.trimmed) {
-      debugPrint(
-        'Trimmed size: ${weaponSprite.spriteSourceSize.width}x${weaponSprite.spriteSourceSize.height}',
-      );
-      debugPrint(
-        'Source size: ${weaponSprite.sourceSize.width}x${weaponSprite.sourceSize.height}',
-      );
-      debugPrint(
-        'Frame position: ${weaponSprite.frame.left},${weaponSprite.frame.top}',
-      );
-    }
+    // debugPrint('=== SPRITE DEBUG ===');
+    // debugPrint('Sprite name: ${weapon.weaponSpriteName}');
+    // debugPrint(
+    //   'Raw sprite size: ${weaponSprite.sprite.srcSize.x}x${weaponSprite.sprite.srcSize.y}',
+    // );
+    // debugPrint('Trimmed: ${weaponSprite.trimmed}');
+    // if (weaponSprite.trimmed) {
+    //   debugPrint(
+    //     'Trimmed size: ${weaponSprite.spriteSourceSize.width}x${weaponSprite.spriteSourceSize.height}',
+    //   );
+    //   debugPrint(
+    //     'Source size: ${weaponSprite.sourceSize.width}x${weaponSprite.sourceSize.height}',
+    //   );
+    //   debugPrint(
+    //     'Frame position: ${weaponSprite.frame.left},${weaponSprite.frame.top}',
+    //   );
+    // }
 
     // Удаляем старый компонент
     _weaponComponent.removeAll(_weaponComponent.children.toList());
@@ -366,11 +376,11 @@ class Player extends PositionComponent with HasCollisionDetection {
     final image = await picture.toImage(playerSize.toInt(), playerSize.toInt());
     weaponSpriteComponent.sprite = Sprite(image);
 
-    // ✅ Устанавливаем угол поворота оружия
-    weaponSpriteComponent.angle = faceAngleRadians;
+    // ✅ Устанавливаем угол поворота оружия (спрайт нужно развернуть на 180°)
+    weaponSpriteComponent.angle = faceAngleRadians + pi;
 
     _weaponComponent.add(weaponSpriteComponent);
-    debugPrint('✅ Weapon sprite added successfully');
+    // debugPrint('✅ Weapon sprite added successfully');
   }
 
   Future<void> _loadAnimations() async {
@@ -505,39 +515,69 @@ class Player extends PositionComponent with HasCollisionDetection {
       // Обновляем угол турели
       _turretComponent.angle = faceAngleRadians;
 
-      // Обновляем угол оружия на основе мыши
+      // Обновляем угол оружия на основе мыши (спрайт развернут на 180°)
       final weaponComponent = _weaponComponent.children.firstOrNull;
       if (weaponComponent is SpriteComponent) {
-        weaponComponent.angle = faceAngleRadians;
+        weaponComponent.angle = faceAngleRadians + pi;
       }
 
-      debugPrint(
-        '🎯 Direction: $directionToAim, Angle: ${faceAngleRadians * 180 / 3.14159}°',
-      );
+      // debugPrint(
+      //   '🎯 Direction: $directionToAim, Angle: ${faceAngleRadians * 180 / 3.14159}°',
+      // );
     }
   }
 
-  /// Метод для движения с проверкой коллизий
+  /// Метод для движения с проверкой коллизий через Flame
   void move(Vector2 direction, double dt) {
     if (direction == Vector2.zero()) return;
 
     final movement = direction.normalized() * _walkSpeed * dt;
     final newPosition = position + movement;
 
-    // Проверка коллизий с миром
-    final gameWorld = findParent<GameWorld>();
-    if (gameWorld != null) {
-      final collidable = gameWorld.isCollidable(newPosition);
-      debugPrint('Move check: newPos=($newPosition), collidable=$collidable');
+    // Проверяем границы карты
+    if (newPosition.x < 32 ||
+        newPosition.y < 32 ||
+        newPosition.x > gameWorld.mapWidth - 32 ||
+        newPosition.y > gameWorld.mapHeight - 32) {
+      return; // За пределами карты
+    }
 
-      if (!collidable) {
-        position = newPosition;
-      } else {
-        debugPrint('🚫 COLLISION! Position blocked');
+    // Проверяем коллизии с другими компонентами через Flame
+    bool hasCollision = false;
+
+    // Проверяем каждый коллизионный блок
+    for (final block in gameWorld.collisionBlocks) {
+      if (_checkCollisionWithBlock(block, newPosition)) {
+        hasCollision = true;
+        break;
       }
-    } else {
+    }
+
+    // Двигаем только если нет коллизий
+    if (!hasCollision) {
       position = newPosition;
     }
+  }
+
+  /// Проверка коллизии игрока с коллизионным блоком
+  bool _checkCollisionWithBlock(PositionComponent block, Vector2 testPosition) {
+    // Вычисляем прямоугольник игрока в тестовой позиции
+    final playerLeft = testPosition.x - 24; // Половина размера хитбокса 48/2
+    final playerRight = testPosition.x + 24;
+    final playerTop = testPosition.y - 24;
+    final playerBottom = testPosition.y + 24;
+
+    // Вычисляем прямоугольник блока
+    final blockLeft = block.position.x;
+    final blockRight = block.position.x + block.size.x;
+    final blockTop = block.position.y;
+    final blockBottom = block.position.y + block.size.y;
+
+    // Проверяем пересечение прямоугольников
+    return playerLeft < blockRight &&
+        playerRight > blockLeft &&
+        playerTop < blockBottom &&
+        playerBottom > blockTop;
   }
 
   @override
@@ -545,24 +585,24 @@ class Player extends PositionComponent with HasCollisionDetection {
     super.render(canvas);
 
     // Рисуем линию направления оружия для отладки
-    final center = Offset.zero;
-    final endPoint = Offset(
-      cos(faceAngleRadians) * 50,
-      sin(faceAngleRadians) * 50,
-    );
+    // final center = Offset.zero;
+    // final endPoint = Offset(
+    //   cos(faceAngleRadians) * 50,
+    //   sin(faceAngleRadians) * 50,
+    // );
 
-    canvas.drawLine(
-      center,
-      endPoint,
-      Paint()
-        ..color = Colors.cyan
-        ..strokeWidth = 3,
-    );
+    // canvas.drawLine(
+    //   center,
+    //   endPoint,
+    //   Paint()
+    //     ..color = Colors.cyan
+    //     ..strokeWidth = 3,
+    // );
 
     // Визуализация хитбокса (зеленым, чтобы было видно)
     final halfSize = 32.0; // Размер хитбокса 64x64
     canvas.drawRect(
-      Rect.fromLTWH(-halfSize, -halfSize, 64, 64),
+      Rect.fromLTWH(32, 32, 64, 64),
       Paint()
         ..color = Colors.green.withOpacity(0.5)
         ..style = PaintingStyle.stroke
@@ -570,12 +610,12 @@ class Player extends PositionComponent with HasCollisionDetection {
     );
 
     // Точка центра
-    canvas.drawCircle(Offset.zero, 4, Paint()..color = Colors.yellow);
+    // canvas.drawCircle(Offset.zero, 4, Paint()..color = Colors.yellow);
 
     // Визуализация размера спрайта (128x128) - красным
-    final spriteHalfSize = 64.0;
+    //  final spriteHalfSize = 64.0;
     canvas.drawRect(
-      Rect.fromLTWH(-spriteHalfSize, -spriteHalfSize, 128, 128),
+      Rect.fromLTWH(0, 0, 128, 128),
       Paint()
         ..color = Colors.red.withOpacity(0.3)
         ..style = PaintingStyle.stroke
@@ -630,13 +670,13 @@ class Player extends PositionComponent with HasCollisionDetection {
   /// Переключить оружие на указанный слот
   void selectWeapon(int slot) {
     if (slot < 0 || slot >= _weapons.length) {
-      debugPrint('Invalid weapon slot: $slot');
+      // debugPrint('Invalid weapon slot: $slot');
       return;
     }
     _selectedWeaponSlot = slot;
-    debugPrint(
-      'Selected weapon slot: $slot - ${_weapons[slot]?.displayName ?? "Empty"}',
-    );
+    // debugPrint(
+    //   'Selected weapon slot: $slot - ${_weapons[slot]?.displayName ?? "Empty"}',
+    // );
 
     // Обновить отображение оружия
     updateWeaponSprite();
@@ -683,16 +723,16 @@ class Player extends PositionComponent with HasCollisionDetection {
 
   /// Добавить снаряд в игровой мир (вызывается из WeaponBase)
   void addToWorld(PositionComponent component) {
-    debugPrint('addToWorld called for: ${component.runtimeType}');
+    // debugPrint('addToWorld called for: ${component.runtimeType}');
     // Находим родительский компонент (GameWorld) и добавляем снаряд
     final parent = findParent<PositionComponent>();
     if (parent != null) {
       parent.add(component);
-      debugPrint(
-        '✅ Component added to parent at position: ${component.position}',
-      );
+      // debugPrint(
+      //   '✅ Component added to parent at position: ${component.position}',
+      // );
     } else {
-      debugPrint('❌ Parent not found!');
+      // debugPrint('❌ Parent not found!');
     }
   }
 
@@ -742,15 +782,15 @@ class Player extends PositionComponent with HasCollisionDetection {
     final currentWeapon = selectedWeapon;
 
     if (isShooting) {
-      debugPrint(
-        '🎯 Shooting! Weapon: ${currentWeapon?.displayName ?? "None"}',
-      );
-      debugPrint('   Mouse pressed: ${inputManager!.isLeftMousePressed}');
-      debugPrint('   Space pressed: ${inputManager!.isSpacePressed}');
+      // debugPrint(
+      //   '🎯 Shooting! Weapon: ${currentWeapon?.displayName ?? "None"}',
+      // );
+      // debugPrint('   Mouse pressed: ${inputManager!.isLeftMousePressed}');
+      // debugPrint('   Space pressed: ${inputManager!.isSpacePressed}');
     }
 
     if (currentWeapon != null && isShooting) {
-      debugPrint('🔥 Calling tryFire for ${currentWeapon.displayName}');
+      // debugPrint('🔥 Calling tryFire for ${currentWeapon.displayName}');
       currentWeapon.tryFire(this);
     }
   }

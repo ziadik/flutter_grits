@@ -25,7 +25,7 @@ import 'package:flutter_grits/flame_game/components/crosshair.dart';
 
 class GritsGame extends FlameGame
     with
-        HasCollisionDetection,
+        // HasCollisionDetection,
         KeyboardEvents,
         // HoverCallbacks,
         TapCallbacks,
@@ -142,7 +142,7 @@ class GritsGame extends FlameGame
       position: Vector2(20, 20),
     ).then((indicator) {
       camera.viewport.add(indicator);
-      debugPrint('✅ Weapon indicator added to HUD');
+      // debugPrint('✅ Weapon indicator added to HUD');
     });
   }
 
@@ -188,13 +188,13 @@ class GritsGame extends FlameGame
       // Добавляем оверлей В МИР, а не на камеру
       if (!gameWorld.children.contains(_collisionDebugOverlay)) {
         gameWorld.add(_collisionDebugOverlay!);
-        debugPrint('🔍 Отладочный режим: ВКЛЮЧЕН');
+        // debugPrint('🔍 Отладочный режим: ВКЛЮЧЕН');
       }
     } else {
       // Удаляем оверлей
       if (_collisionDebugOverlay != null) {
         _collisionDebugOverlay?.removeFromParent();
-        debugPrint('❌ Отладочный режим: ВЫКЛЮЧЕН');
+        // debugPrint('❌ Отладочный режим: ВЫКЛЮЧЕН');
       }
     }
   }
@@ -226,25 +226,25 @@ class GritsGame extends FlameGame
 
   @override
   void onTapDown(TapDownEvent event) {
-    debugPrint('🖱️ Mouse DOWN - button: ${event.deviceKind}');
+    // debugPrint('🖱️ Mouse DOWN - button: ${event.deviceKind}');
 
     final worldPos = camera.globalToLocal(_lastMouseScreenPos);
 
     if (event.deviceKind == PointerDeviceKind.mouse) {
       inputManager.handleMousePress(worldPos);
       inputManager.handleMouseButtonPress(1);
-      debugPrint('🎯 Left mouse DOWN at world: $worldPos');
+      // debugPrint('🎯 Left mouse DOWN at world: $worldPos');
     }
   }
 
   @override
   void onTapUp(TapUpEvent event) {
-    debugPrint('🖱️ Mouse UP - button: ${event.deviceKind}');
+    // debugPrint('🖱️ Mouse UP - button: ${event.deviceKind}');
 
     if (event.deviceKind == PointerDeviceKind.mouse) {
       inputManager.handleMouseRelease();
       inputManager.handleMouseButtonRelease(1);
-      debugPrint('🎯 Left mouse UP');
+      // debugPrint('🎯 Left mouse UP');
     }
   }
 

@@ -69,7 +69,7 @@ class SoundManager {
         player.dispose();
       });
     } catch (e) {
-      debugPrint('Error playing sound $filename: $e');
+      // debugPrint('Error playing sound $filename: $e');
     }
   }
 
@@ -87,7 +87,7 @@ class SoundManager {
         player.dispose();
       });
     } catch (e) {
-      debugPrint('Error playing shoot sound $filename: $e');
+      // debugPrint('Error playing shoot sound $filename: $e');
     }
   }
 
