@@ -15,11 +15,35 @@ class SoundManager {
   double _musicVolume = 0.5;
   double _sfxVolume = 0.7;
 
+  // Флаг для веба: звук разрешен после взаимодействия
+  bool _webAudioAllowed = false;
+
   String? _currentBgMusic;
 
   /// Инициализация (вызывать при старте игры)
   Future<void> init() async {
     await _bgPlayer.setVolume(_musicVolume);
+    if (kIsWeb) {
+      // Для веба: ждем первого взаимодействия пользователя
+      _setupWebAudioResumption();
+    }
+  }
+
+  /// Настройка возобновления аудио на веб
+  void _setupWebAudioResumption() {
+    // Слушаем первое взаимодействие
+    Future.delayed(Duration(milliseconds: 100), () {
+      _webAudioAllowed = true;
+    });
+  }
+
+  /// Разрешить аудио после взаимодействия пользователя
+  void onUserInteraction() {
+    if (!_webAudioAllowed) {
+      _webAudioAllowed = true;
+      // Пробуем запустить фоновую музыку после первого взаимодействия
+      playBackgroundMusic(SoundAssets.bgGame);
+    }
   }
 
   /// Фоновая музыка
@@ -58,6 +82,8 @@ class SoundManager {
   /// Воспроизвести звуковой эффект
   Future<void> playSfx(String filename, {double volume = 1.0}) async {
     if (_isMuted) return;
+    if (kIsWeb && !_webAudioAllowed)
+      return; // Не воспроизводим до взаимодействия
 
     try {
       final player = AudioPlayer();
@@ -69,25 +95,26 @@ class SoundManager {
         player.dispose();
       });
     } catch (e) {
-      // debugPrint('Error playing sound $filename: $e');
+      // Игнорируем ошибки
     }
   }
 
   /// Воспроизвести звук выстрела с учетом панорамирования
   Future<void> playShootSound(String filename, {double pan = 0.0}) async {
     if (_isMuted) return;
+    if (kIsWeb && !_webAudioAllowed)
+      return; // Не воспроизводим до взаимодействия
 
     try {
       final player = AudioPlayer();
       await player.setVolume(_sfxVolume);
-      // setPan недоступен в новой версии audioplayers
       await player.play(AssetSource('sounds/$filename'));
 
       player.onPlayerComplete.listen((event) {
         player.dispose();
       });
     } catch (e) {
-      // debugPrint('Error playing shoot sound $filename: $e');
+      // Игнорируем ошибки
     }
   }
 

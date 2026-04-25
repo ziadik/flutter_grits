@@ -102,8 +102,9 @@ class GritsGame extends FlameGame
     // Настраиваем HUD после добавления камеры
     _setupHUD();
 
-    // Запускаем фоновую музыку
-    await SoundManager().playBackgroundMusic(SoundAssets.bgGame);
+    // Запускаем фоновую музыку только после первого взаимодействия пользователя
+    // SoundManager().playBackgroundMusic(SoundAssets.bgGame);
+    // Музыка запустится при первом клике/нажатии через onUserInteraction()
   }
 
   void _setupHUD() {
