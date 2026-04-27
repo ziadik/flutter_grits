@@ -13,6 +13,7 @@ import 'package:flutter_grits/flame_game/components/energy_bar_component.dart';
 import 'package:flutter_grits/flame_game/models/player_animator.dart';
 import 'package:flutter_grits/flame_game/weapons/weapon_base.dart';
 import 'package:flutter_grits/flame_game/game/world/game_world.dart';
+import 'package:flutter_grits/flame_game/entities/game_entity.dart';
 
 class TrimmedSpriteAnimationComponent extends PositionComponent {
   List<TrimmedSprite> _frames = [];
@@ -741,6 +742,28 @@ class Player extends PositionComponent
   bool isSwordActive = false;
   bool isThrustersActive = false;
 
+  // Для телепортации
+  Vector2? lastTeleportPosition;
+
+  // Для Quad Damage
+  double _damageMultiplier = 1.0;
+  double _quadDamageEndTime = 0;
+
+  /// Активировать Quad Damage (4x урон на 10 секунд)
+  void activateQuadDamage() {
+    _damageMultiplier = 4.0;
+    _quadDamageEndTime = DateTime.now().millisecondsSinceEpoch / 1000 + 10.0;
+  }
+
+  /// Получить множитель урона
+  double getDamageMultiplier() {
+    final now = DateTime.now().millisecondsSinceEpoch / 1000;
+    if (now > _quadDamageEndTime) {
+      _damageMultiplier = 1.0;
+    }
+    return _damageMultiplier;
+  }
+
   /// Получить текущий выбранный слот оружия
   int get selectedWeaponSlot => _selectedWeaponSlot;
 
@@ -771,6 +794,21 @@ class Player extends PositionComponent
       energy = (energy + 20 * dt).clamp(0, maxEnergy);
       _energyBar.updateEnergy(energy, maxEnergy);
     }
+  }
+
+  @override
+  void onCollisionStart(
+    Set<Vector2> intersectionPoints,
+    PositionComponent other,
+  ) {
+    super.onCollisionStart(intersectionPoints, other);
+
+    // Проверяем, является ли другой объект GameEntity
+    if (other is GameEntity && !other.isKilled) {
+      other.onTouch(this, intersectionPoints.first, Vector2.zero());
+    }
+
+    // Проверяем коллизию со стенами (уже обрабатывается в move())
   }
 
   /// Обработка стрельбы из текущего оружия

@@ -139,7 +139,7 @@ class CollisionDebugOverlay extends PositionComponent {
 
   /// Отрисовка интерактивных предметов
   void _renderInteractiveItems(Canvas canvas) {
-    // Проходим по всем спавнерам
+    // Простая отрисовка spawners
     for (final spawner in gameWorld.spawners) {
       final paint = Paint()
         ..color = Colors.blue.withOpacity(0.5)
@@ -153,23 +153,6 @@ class CollisionDebugOverlay extends PositionComponent {
           height: spawner.size.y,
         ),
         paint,
-      );
-
-      // Имя предмета
-      final textPainter = TextPainter(
-        text: TextSpan(
-          text: spawner.name,
-          style: const TextStyle(color: Colors.white, fontSize: 12),
-        ),
-        textDirection: TextDirection.ltr,
-      );
-      textPainter.layout();
-      textPainter.paint(
-        canvas,
-        Offset(
-          spawner.position.x - textPainter.width / 2,
-          spawner.position.y - spawner.size.y / 2 - 20,
-        ),
       );
     }
   }
