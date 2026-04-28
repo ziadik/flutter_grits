@@ -1,11 +1,12 @@
 // lib/flame_game/effects/muzzle_flash.dart
 import 'dart:ui' as ui;
 import 'package:flame/components.dart';
+import 'package:flame/collisions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_grits/flame_game/models/player_animator.dart';
 
 /// Компонент вспышки выстрела (muzzle flash)
-class MuzzleFlash extends PositionComponent {
+class MuzzleFlash extends PositionComponent with HasCollisionDetection {
   final List<TrimmedSprite> _frames;
   int _currentFrame = 0;
   double _frameTime = 0;
@@ -33,28 +34,21 @@ class MuzzleFlash extends PositionComponent {
   Future<void> onLoad() async {
     await super.onLoad();
     if (_frames.isNotEmpty) {
-      await _updateSprite();
+      await _updateSprite(0);
     }
-  }
-
-  Future<void> _updateSprite() async {
-    if (_currentFrame >= _frames.length) return;
-
-    final frame = _frames[_currentFrame];
-    final pictureRecorder = ui.PictureRecorder();
-    final canvas = ui.Canvas(pictureRecorder);
-
-    frame.renderCentered(canvas, Vector2.zero(), Size(size.x, size.y), null);
-
-    final picture = pictureRecorder.endRecording();
-    final image = await picture.toImage(size.x.toInt(), size.y.toInt());
-    _currentSprite = Sprite(image);
   }
 
   @override
   void render(Canvas canvas) {
     super.render(canvas);
-    _currentSprite?.render(canvas, position: Vector2.zero());
+    if (_currentSprite != null) {
+      canvas.save();
+      // Применяем поворот
+      canvas.translate(0, 0);
+      canvas.rotate(angle);
+      _currentSprite!.render(canvas, position: Vector2.zero());
+      canvas.restore();
+    }
   }
 
   @override
@@ -72,8 +66,22 @@ class MuzzleFlash extends PositionComponent {
         removeFromParent();
         return;
       }
-      _updateSprite();
+      _updateSprite(_currentFrame);
     }
+  }
+
+  Future<void> _updateSprite(int frameIndex) async {
+    if (frameIndex >= _frames.length) return;
+
+    final frame = _frames[frameIndex];
+    final pictureRecorder = ui.PictureRecorder();
+    final canvas = ui.Canvas(pictureRecorder);
+
+    frame.renderCentered(canvas, Vector2.zero(), Size(size.x, size.y), null);
+
+    final picture = pictureRecorder.endRecording();
+    final image = await picture.toImage(size.x.toInt(), size.y.toInt());
+    _currentSprite = Sprite(image);
   }
 }
 

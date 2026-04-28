@@ -1,20 +1,28 @@
-// lib/flame_game/projectiles/bullet.dart
-import 'dart:ui' show Canvas, Offset, Paint;
-import 'package:flutter/material.dart';
+import 'dart:ui' as ui;
+import 'dart:math';
 import 'package:flame/components.dart';
-import 'package:flutter_grits/flame_game/weapons/weapon_base.dart';
+import 'package:flame/collisions.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_grits/flame_game/entities/game_entity.dart';
 import 'package:flutter_grits/flame_game/entities/player.dart';
+import 'package:flutter_grits/flame_game/projectiles/projectile_base.dart';
+import 'package:flutter_grits/flame_game/models/player_animator.dart';
+import 'package:flutter_grits/flame_game/effects/explosion.dart';
 import 'package:flutter_grits/flame_game/managers/sound_manager.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter_grits/flame_game/game/world/game_world.dart';
 
-/// Базовая пуля для MachineGun, ChainGun и других скорострельных оружий.
-///
-/// Характеристики из JS кода (SimpleProjectile):
-/// - speed: 700-800
-/// - lifetime: 1.5-2s
-/// - damage: 5
+/// Базовый снаряд для всех оружий
 class Bullet extends ProjectileBase {
+  final GameWorld gameWorld; // Добавляем ссылку на мир
+  Sprite? _currentSprite;
+  List<TrimmedSprite> _animationFrames = [];
+  int _currentFrame = 0;
+  double _frameTime = 0;
+  final double _frameDuration = 0.05; // 20 FPS для анимации снаряда
+  double _rotationAngle = 0; // Угол поворота снаряда
+
   Bullet({
+    required this.gameWorld,
     required super.position,
     required super.owner,
     required super.direction,
@@ -22,48 +30,85 @@ class Bullet extends ProjectileBase {
     required super.speed,
     required super.lifetime,
     String? spritePattern,
-  }) : super(spritePattern: spritePattern ?? 'machinegun_projectile_');
-
-  @override
-  void onCollision(Vector2 collisionPoint, PositionComponent other) {
-    // Проверка, является ли объект целью
-    if (!isTarget(other)) {
-      return;
+  }) : super(spritePattern: spritePattern ?? 'machinegun_projectile_') {
+    // Размер снаряда зависит от типа оружия
+    if (spritePattern?.contains('rocket') ?? false) {
+      size = Vector2(16, 16);
+    } else if (spritePattern?.contains('grenade') ?? false) {
+      size = Vector2(12, 12);
+    } else {
+      size = Vector2(8, 8);
     }
 
-    // Нанести урон игроку
-    if (other is Player) {
-      other.takeDamage(damage);
+    // Вычисляем угол поворота из направления полета
+    if (direction.x != 0 || direction.y != 0) {
+      _rotationAngle = atan2(direction.y, direction.x);
     }
-
-    // Воспроизвести звук удара/взрыва
-    SoundManager().playSfx(SoundAssets.bounce0);
-
-    // Уничтожить пулю
-    destroy();
   }
 
   @override
-  void destroy() {
-    // TODO: Добавить эффект исчезновения
-    super.destroy();
+  Future<void> onLoad() async {
+    await super.onLoad();
+    await _loadAnimation();
+
+    // Добавляем хитбокс для коллизий
+    add(RectangleHitbox(size: size, anchor: Anchor.center));
+  }
+
+  Future<void> _loadAnimation() async {
+    final animator = owner.resourceManager.playerAnimator;
+
+    // Загружаем анимацию снаряда по паттерну
+    final sprites = animator.getSpritesByPattern('${spritePattern}.*\\.png');
+
+    debugPrint(
+      '🔫 Bullet: Found ${sprites.length} sprites for pattern: $spritePattern',
+    );
+
+    if (sprites.isNotEmpty) {
+      _animationFrames = sprites;
+      await _updateSprite(0);
+    } else {
+      debugPrint(
+        '⚠️ No projectile sprites found for $spritePattern, using fallback',
+      );
+    }
+  }
+
+  Future<void> _updateSprite(int frameIndex) async {
+    if (frameIndex >= _animationFrames.length) return;
+
+    final frame = _animationFrames[frameIndex];
+    final pictureRecorder = ui.PictureRecorder();
+    final canvas = ui.Canvas(pictureRecorder);
+
+    frame.renderCentered(canvas, Vector2.zero(), Size(size.x, size.y), null);
+
+    final picture = pictureRecorder.endRecording();
+    final image = await picture.toImage(size.x.toInt(), size.y.toInt());
+    _currentSprite = Sprite(image);
   }
 
   @override
   void update(double dt) {
     super.update(dt);
 
+    // Анимация снаряда
+    if (_animationFrames.isNotEmpty) {
+      _frameTime += dt;
+      if (_frameTime >= _frameDuration) {
+        _frameTime = 0;
+        _currentFrame = (_currentFrame + 1) % _animationFrames.length;
+        _updateSprite(_currentFrame);
+      }
+    }
+
     // Движение снаряда
     final moveVector = direction.normalized() * speed * dt;
     position += moveVector;
 
-    // debugPrint(
-    //   '📍 Bullet update: pos=$position, dir=${direction.normalized()}, speed=$speed',
-    // );
-
     lifetime -= dt;
     if (lifetime <= 0) {
-      // debugPrint('💥 Bullet lifetime expired');
       destroy();
     }
   }
@@ -71,18 +116,51 @@ class Bullet extends ProjectileBase {
   @override
   void render(Canvas canvas) {
     super.render(canvas);
+    if (_currentSprite != null) {
+      canvas.save();
+      // Применяем поворот в центре снаряда
+      canvas.translate(0, 0);
+      canvas.rotate(_rotationAngle);
+      _currentSprite!.render(canvas, position: Vector2.zero());
+      canvas.restore();
+    } else {
+      // Fallback отрисовка для отладки
+      canvas.save();
+      canvas.translate(0, 0);
+      canvas.rotate(_rotationAngle);
+      canvas.drawCircle(Offset.zero, size.x / 2, Paint()..color = Colors.red);
+      // Линия направления
+      canvas.drawLine(
+        Offset.zero,
+        Offset(size.x, 0),
+        Paint()
+          ..color = Colors.white
+          ..strokeWidth = 2,
+      );
+      canvas.restore();
+    }
+  }
 
-    // Рисуем пулю как красный круг для отладки
-    canvas.drawCircle(Offset.zero, 4, Paint()..color = const Color(0xFFFF0000));
-
-    // Линия направления
-    final dirOffset = Offset(direction.x * 15, direction.y * 15);
-    canvas.drawLine(
-      Offset.zero,
-      dirOffset,
-      Paint()
-        ..color = const Color(0xFFFFFFFF)
-        ..strokeWidth = 2,
+  @override
+  void onCollisionStart(
+    Set<Vector2> intersectionPoints,
+    PositionComponent other,
+  ) {
+    // Создаем взрыв при столкновении
+    final explosion = ExplosionEffect(
+      position: position,
+      animator: owner.resourceManager.playerAnimator,
     );
+    gameWorld.add(explosion);
+
+    // Звук взрыва
+    SoundManager().playSfx(SoundAssets.explode0);
+
+    destroy();
+  }
+
+  @override
+  void destroy() {
+    removeFromParent();
   }
 }

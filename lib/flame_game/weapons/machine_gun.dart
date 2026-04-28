@@ -63,6 +63,7 @@ class MachineGun extends WeaponBase {
 
     // Создать пулю
     final bullet = Bullet(
+      gameWorld: player.gameWorld,
       position: spawnPos,
       owner: player,
       direction: direction,

@@ -196,16 +196,19 @@ class Player extends PositionComponent
     await _createComponents();
     await _loadAnimations();
 
-    // ✅ Добавляем хитбокс для коллизий
+    // Добавляем хитбокс для коллизий
     add(
       RectangleHitbox(
         position: Vector2.zero(),
         anchor: Anchor.center,
-        size: Vector2(48, 48), // Чуть меньше спрайта для лучшего геймплея
+        size: Vector2(48, 48),
       ),
     );
 
-    debugPrint('✅ Hitbox added to player');
+    // Устанавливаем высокий приоритет для отрисовки поверх стен
+    priority = 10;
+
+    debugPrint('✅ Hitbox added to player, priority = 10');
   }
 
   Future<void> _createComponents() async {

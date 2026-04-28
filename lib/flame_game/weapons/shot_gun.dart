@@ -63,6 +63,7 @@ class ShotGun extends WeaponBase {
       final spawnPos = getBulletSpawnOffset(player, 20);
 
       final bullet = Bullet(
+        gameWorld: player.gameWorld,
         position: spawnPos,
         owner: player,
         direction: direction,

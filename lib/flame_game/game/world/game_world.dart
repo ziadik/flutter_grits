@@ -114,6 +114,11 @@ class GameWorld extends World with HasCollisionDetection {
       debugPrint(
         '✅ Создано ${collisionBlocks.length} коллизионных блоков из TileLayer',
       );
+
+      // Устанавливаем низкий приоритет для стен
+      for (final block in collisionBlocks) {
+        block.priority = 0;
+      }
     } else if (collisionLayer is ObjectGroup) {
       // Для ObjectGroup - создаем блоки для каждого объекта
       for (final obj in collisionLayer.objects) {

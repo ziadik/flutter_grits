@@ -56,11 +56,12 @@ class ChainGun extends WeaponBase {
 
     // Создать пулю
     final bullet = Bullet(
+      gameWorld: player.gameWorld,
       position: spawnPos,
       owner: player,
       direction: direction,
       damage: damage,
-      speed: 800,
+      speed: 900,
       lifetime: 1.5,
       spritePattern: projectileSpritePattern,
     );

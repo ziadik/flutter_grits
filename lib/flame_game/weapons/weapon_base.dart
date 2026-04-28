@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_grits/flame_game/entities/player.dart';
 import 'package:flutter_grits/flame_game/effects/muzzle_flash.dart';
 import 'package:flutter_grits/flame_game/game/world/game_world.dart';
+import 'package:flutter_grits/flame_game/projectiles/projectile_base.dart';
 
 /// Абстрактный базовый класс для всех видов оружия.
 ///
@@ -144,13 +145,14 @@ abstract class WeaponBase {
       '${muzzleSpritePattern}.*\\.png',
     );
 
-    // debugPrint(
-    //   '🔫 Muzzle flash sprites for $displayName: ${muzzleSprites.length}',
-    // );
+    debugPrint(
+      '🔫 $displayName: Found ${muzzleSprites.length} muzzle sprites for pattern: $muzzleSpritePattern',
+    );
 
     if (muzzleSprites.isEmpty) {
-      // Если спрайты не найдены, используем простой fallback
-      // debugPrint('⚠️ No muzzle flash sprites found for $displayName');
+      debugPrint(
+        '⚠️ No muzzle flash sprites found for $displayName, using fallback',
+      );
       createSimpleMuzzleFlash(player, offset);
       return;
     }
@@ -187,57 +189,4 @@ abstract class WeaponBase {
   }
 }
 
-/// Абстрактный базовый класс для снарядов
-abstract class ProjectileBase extends PositionComponent {
-  final Player owner;
-  final Vector2 direction;
-  final double damage;
-  final double speed;
-  double lifetime;
-  final double maxLifetime;
-  final String spritePattern; // Паттерн для загрузки спрайтов из JSON
-
-  ProjectileBase({
-    required Vector2 position,
-    required this.owner,
-    required this.direction,
-    required this.damage,
-    required this.speed,
-    required this.lifetime,
-    this.spritePattern = '',
-  }) : maxLifetime = lifetime,
-       super(position: position) {
-    size = Vector2(8, 8);
-    anchor = Anchor.center;
-  }
-
-  @override
-  void update(double dt) {
-    super.update(dt);
-
-    // Движение снаряда
-    position += direction.normalized() * speed * dt;
-
-    // Уменьшение времени жизни
-    lifetime -= dt;
-    if (lifetime <= 0) {
-      destroy();
-    }
-  }
-
-  /// Обработка коллизии
-  void onCollision(Vector2 collisionPoint, PositionComponent other) {
-    // Базовая реализация - ничего не делает
-  }
-
-  /// Уничтожение снаряда
-  void destroy() {
-    removeFromParent();
-  }
-
-  /// Проверка, является ли объект целью (не союзник)
-  bool isTarget(PositionComponent other) {
-    if (other is! Player) return true; // Стены, объекты - цели
-    return other.team != owner.team; // Только враги
-  }
-}
+/// Простой muzzle flash без спрайтов (для отладки)

@@ -56,11 +56,12 @@ class RocketLauncher extends WeaponBase {
 
     // Создать ракету
     final rocket = Bullet(
+      gameWorld: player.gameWorld,
       position: spawnPos,
       owner: player,
       direction: direction,
       damage: damage,
-      speed: 900,
+      speed: 300,
       lifetime: 3.0,
       spritePattern: projectileSpritePattern,
     );
