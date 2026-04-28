@@ -835,4 +835,21 @@ class Player extends PositionComponent
       currentWeapon.tryFire(this);
     }
   }
+
+  /// Получить направление взгляда (на мышь)
+  Vector2 getAimDirection() {
+    if (inputManager?.mousePosition != null) {
+      final directionToAim = inputManager!.mousePosition! - position;
+      if (directionToAim.length2 > 0.001) {
+        return directionToAim.normalized();
+      }
+    }
+    // Если мышь не определена, используем текущий угол
+    return Vector2(cos(faceAngleRadians), sin(faceAngleRadians));
+  }
+
+  /// Получить направление стрельбы от игрока
+  Vector2 getFireDirection(Player player) {
+    return getAimDirection();
+  }
 }

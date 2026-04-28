@@ -1,18 +1,19 @@
 // lib/flame_game/effects/muzzle_flash.dart
 import 'dart:ui' as ui;
+import 'dart:math';
 import 'package:flame/components.dart';
-import 'package:flame/collisions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_grits/flame_game/models/player_animator.dart';
 
 /// Компонент вспышки выстрела (muzzle flash)
-class MuzzleFlash extends PositionComponent with HasCollisionDetection {
+class MuzzleFlash extends PositionComponent {
   final List<TrimmedSprite> _frames;
   int _currentFrame = 0;
   double _frameTime = 0;
   final double _frameDuration;
   bool _isPlaying = true;
   Sprite? _currentSprite;
+  double _rotationAngle = 0;
 
   MuzzleFlash({
     required Vector2 position,
@@ -24,15 +25,17 @@ class MuzzleFlash extends PositionComponent with HasCollisionDetection {
        _frameDuration = frameDuration,
        super(
          position: position,
-         size: size ?? Vector2(64, 64),
+         size: size ?? Vector2(256, 256),
          anchor: Anchor.center,
        ) {
-    this.angle = angle;
+    // Сохраняем угол поворота
+    _rotationAngle = angle;
   }
 
   @override
   Future<void> onLoad() async {
     await super.onLoad();
+
     if (_frames.isNotEmpty) {
       await _updateSprite(0);
     }
@@ -43,10 +46,17 @@ class MuzzleFlash extends PositionComponent with HasCollisionDetection {
     super.render(canvas);
     if (_currentSprite != null) {
       canvas.save();
-      // Применяем поворот
-      canvas.translate(0, 0);
-      canvas.rotate(angle);
+
+      // Перемещаемся в центр компонента
+      canvas.translate(size.x / 2, size.y / 2);
+      // Поворачиваем
+      canvas.rotate(_rotationAngle);
+      // Возвращаемся обратно и рисуем спрайт с учетом смещения
+      canvas.translate(-size.x / 2, -size.y / 2);
+
+      // Рисуем спрайт
       _currentSprite!.render(canvas, position: Vector2.zero());
+
       canvas.restore();
     }
   }
@@ -88,11 +98,13 @@ class MuzzleFlash extends PositionComponent with HasCollisionDetection {
 /// Простой muzzle flash без спрайтов (fallback)
 class SimpleMuzzleFlash extends PositionComponent {
   double _lifeTime = 0.1;
+  double _rotationAngle = 0;
 
-  SimpleMuzzleFlash({required Vector2 position}) {
+  SimpleMuzzleFlash({required Vector2 position, double angle = 0}) {
     this.position = position;
-    size = Vector2(20, 20);
+    size = Vector2(24, 24);
     anchor = Anchor.center;
+    _rotationAngle = angle;
   }
 
   @override
@@ -107,13 +119,21 @@ class SimpleMuzzleFlash extends PositionComponent {
   @override
   void render(Canvas canvas) {
     final opacity = (_lifeTime / 0.1).clamp(0.0, 1.0);
+
+    canvas.save();
+    canvas.translate(0, 0);
+    canvas.rotate(_rotationAngle);
+
+    // Основной круг
     canvas.drawCircle(
       Offset.zero,
       size.x / 2,
       Paint()
-        ..color = Colors.yellow.withOpacity(opacity * 0.8)
+        ..color = Colors.yellow.withOpacity(opacity * 0.9)
         ..style = PaintingStyle.fill,
     );
+
+    // Внутренний круг
     canvas.drawCircle(
       Offset.zero,
       size.x / 3,
@@ -121,5 +141,17 @@ class SimpleMuzzleFlash extends PositionComponent {
         ..color = Colors.white.withOpacity(opacity)
         ..style = PaintingStyle.fill,
     );
+
+    // Лучи в направлении выстрела
+    final rayPaint = Paint()
+      ..color = Colors.orange.withOpacity(opacity * 0.8)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3;
+
+    canvas.drawLine(Offset.zero, Offset(size.x, 0), rayPaint);
+    canvas.drawLine(Offset.zero, Offset(size.x * 0.6, -size.x * 0.3), rayPaint);
+    canvas.drawLine(Offset.zero, Offset(size.x * 0.6, size.x * 0.3), rayPaint);
+
+    canvas.restore();
   }
 }

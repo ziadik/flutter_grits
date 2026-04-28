@@ -98,7 +98,9 @@ abstract class WeaponBase {
 
   /// Получить направление стрельбы от игрока
   Vector2 getFireDirection(Player player) {
-    return Vector2(cos(player.faceAngleRadians), sin(player.faceAngleRadians));
+    return player.getFireDirection(
+      player,
+    ); //Vector2(cos(player.faceAngleRadians), sin(player.faceAngleRadians));
   }
 
   /// Получить позицию спавна пули (смещение от игрока)
@@ -133,7 +135,6 @@ abstract class WeaponBase {
   /// Создать эффект вспышки выстрела (muzzle flash)
   void createMuzzleFlash(Player player, Vector2 offset) {
     if (muzzleSpritePattern.isEmpty) {
-      // Fallback - простой muzzle flash без спрайтов
       createSimpleMuzzleFlash(player, offset);
       return;
     }
@@ -157,18 +158,27 @@ abstract class WeaponBase {
       return;
     }
 
-    // Вычисляем позицию muzzle flash относительно игрока
-    final direction = getFireDirection(player);
-    final muzzlePos =
-        player.position +
-        direction * offset.x +
-        Vector2(-direction.y, direction.x) * offset.y;
+    // Получаем направление стрельбы (единичный вектор)
+    final direction = player.getAimDirection();
+
+    // ✅ Правильное вычисление позиции muzzle flash:
+    // offset.x - расстояние по направлению выстрела (вперёд от центра игрока)
+    // offset.y - боковое смещение дула относительно центра игрока
+    // Используем левый перпендикуляр (direction.y, -direction.x) для корректной работы с отрицательными значениями Y
+    final forward = direction * offset.x;
+    final side = Vector2(direction.y, -direction.x) * offset.y;
+
+    final muzzlePos = player.position + forward + side;
+
+    debugPrint(
+      '🔫 Muzzle flash - pos: $muzzlePos, dir: $direction, offset: $offset, angle: ${player.faceAngleRadians * 180 / pi}°',
+    );
 
     final muzzle = MuzzleFlash(
       position: muzzlePos,
       frames: muzzleSprites,
       frameDuration: 0.05,
-      size: Vector2(64, 64),
+      size: Vector2(48, 48),
       angle: player.faceAngleRadians,
     );
 
@@ -178,13 +188,16 @@ abstract class WeaponBase {
 
   /// Простой muzzle flash без спрайтов (fallback)
   void createSimpleMuzzleFlash(Player player, Vector2 offset) {
-    final direction = getFireDirection(player);
-    final muzzlePos =
-        player.position +
-        direction * offset.x +
-        Vector2(-direction.y, direction.x) * offset.y;
+    final direction = player.getAimDirection();
 
-    final flash = SimpleMuzzleFlash(position: muzzlePos);
+    final forward = direction * offset.x;
+    final side = Vector2(direction.y, -direction.x) * offset.y;
+    final muzzlePos = player.position + forward + side;
+
+    final flash = SimpleMuzzleFlash(
+      position: muzzlePos,
+      angle: player.faceAngleRadians,
+    );
     addEffectToWorld(flash);
   }
 }
