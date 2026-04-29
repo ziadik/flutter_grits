@@ -9,6 +9,7 @@ import 'package:flame/events.dart'
         TapCallbacks,
         TapDownEvent,
         TapUpEvent;
+
 import 'package:flame/src/events/messages/pointer_move_event.dart';
 import 'package:flutter/gestures.dart' hide PointerMoveEvent;
 import 'package:flutter/services.dart';
@@ -23,6 +24,9 @@ import 'package:flutter_grits/flame_game/components/hud/weapon_indicator.dart';
 import 'package:flutter_grits/flame_game/components/hud/settings_button.dart';
 import 'package:flutter_grits/flame_game/components/debug/collision_debug_overlay.dart';
 import 'package:flutter_grits/flame_game/components/crosshair.dart';
+import 'package:flutter_grits/flame_game/widgets/settings_dialog.dart';
+import 'package:flutter_grits/main.dart' show navigatorKey;
+import 'package:flutter/material.dart' hide PointerMoveEvent;
 
 class GritsGame extends FlameGame
     with KeyboardEvents, TapCallbacks, PointerMoveCallbacks {
@@ -39,10 +43,30 @@ class GritsGame extends FlameGame
 
   GritsGame({required this.resourceManager}) : super();
 
+  /// Метод для показа диалога настроек из Flame компонента
+  void showSettingsDialog() {
+    _showSettingsDialog();
+  }
+
+  void _showSettingsDialog() {
+    // Используем глобальный navigatorKey для показа диалога
+    try {
+      Navigator.of(navigatorKey.currentContext!, rootNavigator: true).push(
+        MaterialPageRoute(
+          builder: (_) => Scaffold(
+            backgroundColor: Colors.transparent,
+            body: Center(child: SettingsDialog(onClosed: () {})),
+          ),
+        ),
+      );
+    } catch (e) {
+      debugPrint('⚠️ Error showing settings dialog: $e');
+    }
+  }
+
   @override
   void onMount() {
     super.onMount();
-    _gameContext = findGameWidgetContext();
   }
 
   @override
@@ -120,7 +144,10 @@ class GritsGame extends FlameGame
 
     // Кнопка настроек (слева от FPS)
     _settingsButton = SettingsButtonComponent(
-      context: _gameContext,
+      onSettingsRequested: () {
+        // Показываем диалог через Overlay
+        _showSettingsDialog();
+      },
       position: Vector2(screenSize.x - 90, 30),
     );
     camera.viewport.add(_settingsButton!);

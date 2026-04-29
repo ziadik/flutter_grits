@@ -43,6 +43,7 @@ class Bullet extends ProjectileBase {
     // Вычисляем угол поворота из направления полета
     if (direction.x != 0 || direction.y != 0) {
       _rotationAngle = atan2(direction.y, direction.x);
+      _rotationAngle += pi;
     }
   }
 
@@ -58,19 +59,56 @@ class Bullet extends ProjectileBase {
   Future<void> _loadAnimation() async {
     final animator = owner.resourceManager.playerAnimator;
 
+    // Ждем пока аниматор загрузится
+    int attempts = 0;
+    while (!animator.isLoaded && attempts < 50) {
+      await Future.delayed(const Duration(milliseconds: 10));
+      attempts++;
+    }
+
+    if (!animator.isLoaded) {
+      debugPrint('❌ Bullet: PlayerAnimator not loaded after waiting!');
+      return;
+    }
+
+    debugPrint('🎯 Bullet: Animator loaded, spritePattern = $spritePattern');
+
     // Загружаем анимацию снаряда по паттерну
     final sprites = animator.getSpritesByPattern('${spritePattern}.*\\.png');
 
     debugPrint(
-      '🔫 Bullet: Found ${sprites.length} sprites for pattern: $spritePattern',
+      '🔫 Bullet: Found ${sprites.length} sprites for pattern: ${spritePattern}.*\\.png',
     );
 
-    if (sprites.isNotEmpty) {
-      _animationFrames = sprites;
-      await _updateSprite(0);
+    if (sprites.isEmpty) {
+      // Пробуем альтернативный поиск без расширения
+      final altSprites = animator.getSpritesByPattern(spritePattern);
+      debugPrint('🔍 Alternative search: ${altSprites.length} sprites');
+
+      if (altSprites.isEmpty) {
+        debugPrint(
+          '⚠️ No projectile sprites found for $spritePattern, using fallback',
+        );
+        return;
+      }
+
+      _animationFrames = altSprites;
     } else {
+      _animationFrames = sprites;
+    }
+
+    if (_animationFrames.isNotEmpty) {
+      // ✅ Автоматически устанавливаем размер из первого спрайта
+      final firstSprite = _animationFrames.first;
+      size = Vector2(
+        firstSprite.spriteSourceSize.width,
+        firstSprite.spriteSourceSize.height,
+      );
+      debugPrint('✅ Bullet size set to: ${size.x}x${size.y} from sprite');
+
+      await _updateSprite(0);
       debugPrint(
-        '⚠️ No projectile sprites found for $spritePattern, using fallback',
+        '✅ Bullet animation loaded: ${_animationFrames.length} frames',
       );
     }
   }
@@ -118,21 +156,37 @@ class Bullet extends ProjectileBase {
     super.render(canvas);
     if (_currentSprite != null) {
       canvas.save();
-      // Применяем поворот в центре снаряда
-      canvas.translate(0, 0);
+
+      // ✅ Перемещаемся в центр компонента (как в MuzzleFlash)
+      canvas.translate(size.x / 2, size.y / 2);
+      // Поворачиваем на угол направления полёта
       canvas.rotate(_rotationAngle);
+      // Возвращаемся обратно и рисуем спрайт с учетом смещения
+      canvas.translate(-size.x / 2, -size.y / 2);
+
+      // Рисуем спрайт
       _currentSprite!.render(canvas, position: Vector2.zero());
+
       canvas.restore();
     } else {
       // Fallback отрисовка для отладки
       canvas.save();
-      canvas.translate(0, 0);
+      canvas.translate(size.x / 2, size.y / 2);
       canvas.rotate(_rotationAngle);
-      canvas.drawCircle(Offset.zero, size.x / 2, Paint()..color = Colors.red);
+      canvas.translate(-size.x / 2, -size.y / 2);
+
+      canvas.drawCircle(
+        Offset(size.x / 2, size.y / 2),
+        size.x / 2,
+        Paint()..color = Colors.red,
+      );
       // Линия направления
       canvas.drawLine(
-        Offset.zero,
-        Offset(size.x, 0),
+        Offset(size.x / 2, size.y / 2),
+        Offset(
+          size.x / 2 + cos(_rotationAngle) * size.x,
+          size.y / 2 + sin(_rotationAngle) * size.y,
+        ),
         Paint()
           ..color = Colors.white
           ..strokeWidth = 2,

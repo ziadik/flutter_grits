@@ -15,9 +15,10 @@ import 'package:flutter_grits/flame_game/components/game_object_component.dart';
 import 'package:flutter_grits/flame_game/entities/game_entity.dart';
 import 'package:flutter_grits/flame_game/entities/spawn_point.dart';
 import 'package:flutter_grits/flame_game/entities/teleporter.dart';
-import 'package:flutter_grits/flame_game/entities/spawner.dart';
+// import 'package:flutter_grits/flame_game/entities/spawner.dart'; // Удалено
 import 'package:flutter_grits/flame_game/weapons/weapon_registry.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_grits/flame_game/effects/player_spawn_effect.dart';
 
 // Включаем HasCollisionDetection
 class GameWorld extends World with HasCollisionDetection {
@@ -37,8 +38,7 @@ class GameWorld extends World with HasCollisionDetection {
   // Игровые сущности (SpawnPoint, Teleporter, Spawner)
   final List<SpawnPoint> spawnPoints = [];
   final List<Teleporter> teleporters = [];
-  final List<Spawner> entitySpawners =
-      []; // Переименовали чтобы не конфликтовать
+  // final List<Spawner> entitySpawners = []; // Удалено - Spawner больше не используется
 
   // Игровые объекты из слоя game_objects
   final List<GameObjectComponent> gameEntities = [];
@@ -75,7 +75,7 @@ class GameWorld extends World with HasCollisionDetection {
     _loadEnvironmentObjects();
     _loadGameObjects(); // Загружаем игровые объекты из слоя game_objects
     _loadGameEntities(); // Загружаем игровые сущности (спавны, телепорты)
-    _displaySpawnersAsGameObjects(); // Показываем спавнеры как анимированные объекты
+    // _displaySpawnersAsGameObjects(); // УДАЛЕНО - больше не нужно
   }
 
   Future<void> _loadMap() async {
@@ -152,6 +152,14 @@ class GameWorld extends World with HasCollisionDetection {
 
     await add(player);
     debugPrint('✅ Player created at $startPosition');
+
+    // ✅ Показываем эффект появления игрока (спавн)
+    // Эффект будет показан под игроком и удалится через 0.5 сек
+    PlayerSpawnEffect.spawn(
+      position: startPosition,
+      animator: resourceManager.playerAnimator,
+      gameWorld: this,
+    );
   }
 
   Vector2? _getStartPositionFromMap() {
@@ -290,9 +298,8 @@ class GameWorld extends World with HasCollisionDetection {
         type = GameObjectType.quadDamage;
       } else if (objName.contains('TP') || objType.contains('teleporter')) {
         type = GameObjectType.teleporter;
-      } else if (objName.contains('Spawner') || objType.contains('Spawner')) {
-        type = GameObjectType.spawner;
       }
+      // Spawner предметов удалён - больше не используется
 
       if (type != null) {
         final properties = <String, dynamic>{};
@@ -317,7 +324,10 @@ class GameWorld extends World with HasCollisionDetection {
     debugPrint('✅ Загружено игровых объектов: ${gameEntities.length}');
   }
 
-  /// Загрузка игровых сущностей из слоя environment
+  // void _displaySpawnersAsGameObjects() {
+  //   // УДАЛЕНО - больше не нужно
+  // }
+
   void _loadGameEntities() {
     final environmentLayer = tiledMap.tileMap.getLayer<ObjectGroup>(
       'environment',
@@ -342,14 +352,11 @@ class GameWorld extends World with HasCollisionDetection {
       else if (objType == 'SpawnPoint' || objName.contains('SpawnPoint')) {
         _loadSpawnPoint(obj);
       }
-      // Spawner предметов
-      else if (objType == 'Spawner' || objName.contains('Spawner')) {
-        _loadSpawner(obj);
-      }
+      // Spawner предметов - удалён
     }
 
     debugPrint(
-      '✅ Загружено сущностей - SpawnPoints: ${spawnPoints.length}, Teleporters: ${teleporters.length}, Spawners: ${spawners.length}',
+      '✅ Загружено сущностей - SpawnPoints: ${spawnPoints.length}, Teleporters: ${teleporters.length}',
     );
   }
 
@@ -409,103 +416,17 @@ class GameWorld extends World with HasCollisionDetection {
     debugPrint('🏃 SpawnPoint for team $team at ${spawnPoint.position}');
   }
 
-  void _loadSpawner(dynamic obj) {
-    // Получаем свойство SpawnItem из списка свойств
-    String spawnItem = '';
-    for (final prop in obj.properties) {
-      if (prop.name == 'SpawnItem') {
-        spawnItem = prop.value.toString();
-        break;
-      }
-    }
-
-    SpawnItemType type;
-
-    if (spawnItem.contains('Health')) {
-      type = SpawnItemType.healthCanister;
-    } else if (spawnItem.contains('Energy')) {
-      type = SpawnItemType.energyCanister;
-    } else if (spawnItem.contains('Quad')) {
-      type = SpawnItemType.quadDamage;
-    } else {
-      debugPrint('   ⚠️ Unknown spawn item: $spawnItem');
-      return;
-    }
-
-    final spawner = Spawner(
-      position: Vector2(obj.x + obj.width / 2, obj.y + obj.height / 2),
-      spawnItem: type,
-      animator: resourceManager.playerAnimator,
-      gameWorld: this,
-    );
-
-    spawner.onInit();
-    add(spawner);
-    entitySpawners.add(spawner);
-    debugPrint('📦 Spawner for $type at ${spawner.position}');
-  }
+  // void _loadSpawner(dynamic obj) {
+  //   // УДАЛЕНО - Spawner для предметов больше не используется
+  // }
 
   void updateSpawners(double dt) {
-    // Ничего не делаем - Spawner обрабатывает спавн сам
+    // Ничего не делаем - Spawner больше не используется
   }
 
-  /// Отображение спавнеров как GameObjectComponent для визуализации
-  void _displaySpawnersAsGameObjects() {
-    final environmentLayer = tiledMap.tileMap.getLayer<ObjectGroup>(
-      'environment',
-    );
-    if (environmentLayer == null) return;
-
-    debugPrint('🎨 Отображение спавнеров как игровых объектов...');
-
-    for (final obj in environmentLayer.objects) {
-      final objType = obj.type ?? '';
-      final objName = obj.name ?? '';
-
-      if (objType == 'Spawner' || objName.contains('Spawner')) {
-        // Определяем тип предмета для отображения
-        String spawnItem = '';
-        for (final prop in obj.properties) {
-          if (prop.name == 'SpawnItem') {
-            spawnItem = prop.value.toString();
-            break;
-          }
-        }
-
-        // Выбираем иконку для отображения спавнера
-        GameObjectType? gameObjectType;
-        if (spawnItem.contains('Health')) {
-          gameObjectType = GameObjectType.healthCanister;
-        } else if (spawnItem.contains('Energy')) {
-          gameObjectType = GameObjectType.energyCanister;
-        } else if (spawnItem.contains('Quad')) {
-          gameObjectType = GameObjectType.quadDamage;
-        }
-
-        if (gameObjectType != null) {
-          final properties = <String, dynamic>{};
-          for (final prop in obj.properties) {
-            properties[prop.name] = prop.value;
-          }
-
-          final gameObject = GameObjectComponent(
-            position: Vector2(obj.x + obj.width / 2, obj.y + obj.height / 2),
-            type: gameObjectType,
-            name: objName,
-            properties: properties,
-            animator: resourceManager.playerAnimator,
-            size: Vector2(64, 64),
-          );
-
-          add(gameObject);
-          gameEntities.add(gameObject);
-          debugPrint('   ✅ Отображен спавнер: $objName -> $gameObjectType');
-        }
-      }
-    }
-
-    debugPrint('🎨 Отображено ${gameEntities.length} игровых объектов');
-  }
+  // void _displaySpawnersAsGameObjects() {
+  //   // УДАЛЕНО - больше не нужно
+  // }
 
   @override
   void render(Canvas canvas) {

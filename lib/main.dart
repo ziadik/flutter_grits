@@ -6,6 +6,9 @@ import 'package:flutter_grits/flame_game/managers/resource_manager.dart';
 import 'package:flutter_grits/flame_game/managers/sound_manager.dart';
 import 'package:flutter/foundation.dart';
 
+/// Глобальный ключ для доступа к Navigator из Flame кода
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -62,12 +65,12 @@ class GritsApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
       title: 'Grits Game',
       theme: ThemeData.dark(),
       home: Scaffold(
         body: GestureDetector(
-          // Глобальный обработчик клика для разблокировки звука в веб
           onTapDown: (_) => SoundManager().onUserInteraction(),
           child: MouseRegion(
             cursor: SystemMouseCursors.none,

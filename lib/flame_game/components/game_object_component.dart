@@ -9,7 +9,7 @@ enum GameObjectType {
   healthCanister,
   quadDamage,
   teleporter,
-  spawner,
+  // spawner, // Удалено - больше не используется
 }
 
 class GameObjectComponent extends PositionComponent {
@@ -17,7 +17,7 @@ class GameObjectComponent extends PositionComponent {
   final String name;
   final Map<String, dynamic> properties;
   final PlayerAnimator animator;
-  
+
   Sprite? _sprite;
   late List<TrimmedSprite> _animationFrames;
   int _currentFrame = 0;
@@ -57,8 +57,8 @@ class GameObjectComponent extends PositionComponent {
       case GameObjectType.teleporter:
         _loadAnimatedSprite('teleporter_idle_', 16);
         break;
-      case GameObjectType.spawner:
-        _loadAnimatedSprite('spawner_white_activate_', 16);
+      default:
+        debugPrint('⚠️ Unknown GameObjectType: $type');
         break;
     }
   }
@@ -74,7 +74,7 @@ class GameObjectComponent extends PositionComponent {
         _animationFrames.add(sprite);
       }
     }
-    
+
     if (_animationFrames.isNotEmpty) {
       _isAnimating = true;
       _updateSpriteFromFrame(0);
@@ -83,18 +83,13 @@ class GameObjectComponent extends PositionComponent {
 
   Future<void> _updateSpriteFromFrame(int frameIndex) async {
     if (frameIndex >= _animationFrames.length) return;
-    
+
     final frame = _animationFrames[frameIndex];
     final pictureRecorder = ui.PictureRecorder();
     final canvas = ui.Canvas(pictureRecorder);
-    
-    frame.renderCentered(
-      canvas,
-      Vector2.zero(),
-      Size(size.x, size.y),
-      null,
-    );
-    
+
+    frame.renderCentered(canvas, Vector2.zero(), Size(size.x, size.y), null);
+
     final picture = pictureRecorder.endRecording();
     final image = await picture.toImage(size.x.toInt(), size.y.toInt());
     _sprite = Sprite(image);
@@ -103,7 +98,7 @@ class GameObjectComponent extends PositionComponent {
   @override
   void update(double dt) {
     super.update(dt);
-    
+
     if (_isAnimating && _animationFrames.isNotEmpty) {
       _frameTime += dt;
       if (_frameTime >= _frameDuration) {

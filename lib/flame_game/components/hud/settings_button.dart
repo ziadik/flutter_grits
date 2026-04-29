@@ -2,23 +2,14 @@ import 'dart:math';
 import 'package:flame/components.dart';
 import 'package:flame/events.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_grits/flame_game/widgets/settings_dialog.dart';
 
 /// Кнопка настроек в HUD
 class SettingsButtonComponent extends PositionComponent with TapCallbacks {
-  final VoidCallback? onSettingsClicked;
-  final BuildContext? context;
+  final VoidCallback? onSettingsRequested;
   bool _isPressed = false;
 
-  SettingsButtonComponent({
-    this.onSettingsClicked,
-    required Vector2 position,
-    this.context,
-  }) : super(
-         position: position,
-         size: Vector2(40, 40),
-         anchor: Anchor.topRight,
-       );
+  SettingsButtonComponent({this.onSettingsRequested, required Vector2 position})
+    : super(position: position, size: Vector2(40, 40), anchor: Anchor.topRight);
 
   @override
   void render(Canvas canvas) {
@@ -67,6 +58,7 @@ class SettingsButtonComponent extends PositionComponent with TapCallbacks {
 
   @override
   void onTapDown(TapDownEvent event) {
+    debugPrint('press _settingsButton');
     _isPressed = true;
   }
 
@@ -74,18 +66,7 @@ class SettingsButtonComponent extends PositionComponent with TapCallbacks {
   void onTapUp(TapUpEvent event) {
     _isPressed = false;
 
-    // Показываем диалог настроек если контекст доступен
-    if (context != null && context!.mounted) {
-      showDialog(
-        context: context!,
-        barrierDismissible: true,
-        builder: (_) => SettingsDialog(onClosed: () {}),
-      );
-    } else {
-      debugPrint(
-        '⚠️ Cannot show settings dialog - context is null or not mounted',
-      );
-    }
-    onSettingsClicked?.call();
+    // Запрашиваем показ диалога через callback
+    onSettingsRequested?.call();
   }
 }

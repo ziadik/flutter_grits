@@ -115,9 +115,9 @@ abstract class WeaponBase {
     final gameWorld = _owningPlayer?.findParent<GameWorld>();
     if (gameWorld != null) {
       gameWorld.add(projectile);
-      // debugPrint('✅ Projectile added to GameWorld at ${projectile.position}');
+      debugPrint('✅ Projectile added to GameWorld at ${projectile.position}');
     } else {
-      // debugPrint('❌ GameWorld not found for projectile!');
+      debugPrint('❌ GameWorld not found for projectile!');
     }
   }
 
@@ -143,7 +143,7 @@ abstract class WeaponBase {
 
     // Получаем все спрайты для muzzle flash по паттерну
     final muzzleSprites = animator.getSpritesByPattern(
-      '${muzzleSpritePattern}.*\\.png',
+      '${muzzleSpritePattern}',
     );
 
     debugPrint(
