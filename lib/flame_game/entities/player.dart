@@ -201,7 +201,7 @@ class Player extends PositionComponent
       RectangleHitbox(
         position: Vector2.zero(),
         anchor: Anchor.center,
-        size: Vector2(48, 48),
+        size: Vector2(64, 64),
       ),
     );
 
@@ -546,10 +546,8 @@ class Player extends PositionComponent
       return; // За пределами карты
     }
 
-    // Проверяем коллизии с другими компонентами через Flame
+    // Проверяем коллизии со стенами
     bool hasCollision = false;
-
-    // Проверяем каждый коллизионный блок
     for (final block in gameWorld.collisionBlocks) {
       if (_checkCollisionWithBlock(block, newPosition)) {
         hasCollision = true;
@@ -557,7 +555,15 @@ class Player extends PositionComponent
       }
     }
 
-    // Двигаем только если нет коллизий
+    // Проверяем коллизии с телепортами (для триггера, не блокируем движение)
+    for (final teleporter in gameWorld.teleporters) {
+      if (_checkCollisionWithTeleporter(teleporter, newPosition)) {
+        debugPrint('🔔 Player near teleporter at ${teleporter.position}');
+        // НЕ блокируем движение - игрок может пройти сквозь телепорт
+      }
+    }
+
+    // Двигаем только если нет коллизий со стенами
     if (!hasCollision) {
       position = newPosition;
     }
@@ -582,6 +588,37 @@ class Player extends PositionComponent
         playerRight > blockLeft &&
         playerTop < blockBottom &&
         playerBottom > blockTop;
+  }
+
+  /// Проверка коллизии игрока с телепортером
+  bool _checkCollisionWithTeleporter(dynamic teleporter, Vector2 testPosition) {
+    // Получаем позицию и размер телепортёра
+    final telePos = (teleporter as PositionComponent).position;
+    final teleSize = (teleporter as PositionComponent).size;
+
+    // Хитбокс игрока в тестовой позиции
+    final playerLeft = testPosition.x - 24;
+    final playerRight = testPosition.x + 24;
+    final playerTop = testPosition.y - 24;
+    final playerBottom = testPosition.y + 24;
+
+    // Хитбокс телепортёра (центр)
+    final teleLeft = telePos.x - teleSize.x / 2;
+    final teleRight = telePos.x + teleSize.x / 2;
+    final teleTop = telePos.y - teleSize.y / 2;
+    final teleBottom = telePos.y + teleSize.y / 2;
+
+    // Проверяем пересечение
+    final intersects =
+        playerLeft < teleRight &&
+        playerRight > teleLeft &&
+        playerTop < teleBottom &&
+        playerBottom > teleTop;
+
+    if (intersects) {
+      debugPrint('   ✅ Collision with teleporter!');
+    }
+    return intersects;
   }
 
   @override
@@ -805,13 +842,13 @@ class Player extends PositionComponent
     PositionComponent other,
   ) {
     super.onCollisionStart(intersectionPoints, other);
+    debugPrint('💥 Player collision with: ${other.runtimeType}');
 
-    // Проверяем, является ли другой объект GameEntity
+    // Проверяем коллизии с GameEntity (включая Teleporter)
     if (other is GameEntity && !other.isKilled) {
+      debugPrint('   Calling onTouch on GameEntity: ${other.runtimeType}');
       other.onTouch(this, intersectionPoints.first, Vector2.zero());
     }
-
-    // Проверяем коллизию со стенами (уже обрабатывается в move())
   }
 
   /// Обработка стрельбы из текущего оружия

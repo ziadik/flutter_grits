@@ -328,7 +328,7 @@ class GameWorld extends World with HasCollisionDetection {
   //   // УДАЛЕНО - больше не нужно
   // }
 
-  void _loadGameEntities() {
+  Future<void> _loadGameEntities() async {
     final environmentLayer = tiledMap.tileMap.getLayer<ObjectGroup>(
       'environment',
     );
@@ -346,21 +346,76 @@ class GameWorld extends World with HasCollisionDetection {
 
       // Телепортер
       if (objType == 'teleporter') {
-        _loadTeleporter(obj);
+        await _loadTeleporter(obj);
       }
       // SpawnPoint
       else if (objType == 'SpawnPoint' || objName.contains('SpawnPoint')) {
         _loadSpawnPoint(obj);
       }
-      // Spawner предметов - удалён
+      // Spawner предметов (HealthSpawner, EnergySpawner, QuadDamageSpawner)
+      else if (objType == 'Spawner' || objName.contains('Spawner')) {
+        _loadItemSpawner(obj);
+      }
     }
 
     debugPrint(
-      '✅ Загружено сущностей - SpawnPoints: ${spawnPoints.length}, Teleporters: ${teleporters.length}',
+      '✅ Загружено сущностей - SpawnPoints: ${spawnPoints.length}, Teleporters: ${teleporters.length}, ItemSpawners: ${gameEntities.where((e) => e.type == GameObjectType.healthCanister || e.type == GameObjectType.energyCanister || e.type == GameObjectType.quadDamage).length}',
     );
   }
 
-  void _loadTeleporter(dynamic obj) {
+  /// Загрузка спавнера предметов как визуального объекта
+  void _loadItemSpawner(dynamic obj) {
+    // Получаем свойство SpawnItem
+    String spawnItem = '';
+    for (final prop in obj.properties) {
+      if (prop.name == 'SpawnItem') {
+        spawnItem = prop.value.toString();
+        break;
+      }
+    }
+
+    if (spawnItem.isEmpty) {
+      debugPrint('⚠️ Spawner без SpawnItem: ${obj.name}');
+      return;
+    }
+
+    // Определяем тип предмета
+    GameObjectType? type;
+    if (spawnItem.contains('Health')) {
+      type = GameObjectType.healthCanister;
+    } else if (spawnItem.contains('Energy')) {
+      type = GameObjectType.energyCanister;
+    } else if (spawnItem.contains('Quad')) {
+      type = GameObjectType.quadDamage;
+    }
+
+    if (type == null) {
+      debugPrint('⚠️ Неизвестный тип спавнера: $spawnItem');
+      return;
+    }
+
+    final properties = <String, dynamic>{};
+    for (final prop in obj.properties) {
+      properties[prop.name] = prop.value;
+    }
+
+    final gameObject = GameObjectComponent(
+      position: Vector2(obj.x + obj.width / 2, obj.y + obj.height / 2),
+      type: type,
+      name: obj.name ?? 'Spawner',
+      properties: properties,
+      animator: resourceManager.playerAnimator,
+      size: Vector2(64, 64),
+    );
+
+    add(gameObject);
+    gameEntities.add(gameObject);
+    debugPrint(
+      '📦 Загружен спавнер предмета: ${obj.name} -> $type at ${gameObject.position}',
+    );
+  }
+
+  Future<void> _loadTeleporter(dynamic obj) async {
     // Получаем свойство destination
     String destStr = '0,0';
     for (final prop in obj.properties) {
@@ -370,23 +425,26 @@ class GameWorld extends World with HasCollisionDetection {
       }
     }
 
+    // Парсим координаты (формат: "x,y" с точкой как разделителем)
     final destParts = destStr.split(',');
     final destination = Vector2(
       double.tryParse(destParts[0].trim()) ?? 0,
       double.tryParse(destParts[1].trim()) ?? 0,
     );
 
+    debugPrint('🌀 Loading teleporter: $destStr -> $destination');
+
     final teleporter = Teleporter(
-      position: Vector2(obj.x + obj.width / 2, obj.y + obj.height / 2),
+      position: Vector2(obj.x + obj.width * 2 - 5, obj.y + obj.height * 2 - 10),
       destination: destination,
       animator: resourceManager.playerAnimator,
       gameWorld: this,
     );
 
-    teleporter.onInit();
+    await teleporter.onLoad();
     add(teleporter);
     teleporters.add(teleporter);
-    debugPrint('🌀 Teleporter: ${teleporter.position} -> $destination');
+    debugPrint('✅ Teleporter loaded: ${teleporter.position} -> $destination');
   }
 
   void _loadSpawnPoint(dynamic obj) {

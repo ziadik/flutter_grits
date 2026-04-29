@@ -1,6 +1,6 @@
-// lib/flame_game/entities/teleporter.dart
 import 'dart:ui' as ui;
 import 'package:flame/components.dart';
+import 'package:flame/collisions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_grits/flame_game/entities/game_entity.dart';
 import 'package:flutter_grits/flame_game/entities/player.dart';
@@ -12,10 +12,13 @@ class Teleporter extends GameEntity {
   final PlayerAnimator animator;
 
   Sprite? _currentSprite;
-  List<TrimmedSprite> _animationFrames = [];
+  List<TrimmedSprite> _idleFrames = [];
+  List<TrimmedSprite> _activateFrames = [];
   int _currentFrame = 0;
   double _frameTime = 0;
-  final double _frameDuration = 0.1;
+  final double _frameDuration = 1 / 30; // 30 FPS
+  bool _isActivating = false;
+  double _activationTimer = 0;
 
   // Для предотвращения многократного телепорта
   final Map<Player, double> _lastTeleportTime = {};
@@ -26,33 +29,64 @@ class Teleporter extends GameEntity {
     required this.destination,
     required this.animator,
     required GameWorld gameWorld,
-  }) : super(position: position, gameWorld: gameWorld, size: Vector2(64, 64));
+  }) : super(
+         position: position,
+         gameWorld: gameWorld,
+         size: Vector2(128, 128),
+       ) {
+    anchor = Anchor.center;
+  }
+
+  @override
+  Future<void> onLoad() async {
+    await super.onLoad();
+    await _loadAnimation();
+
+    // Добавляем хитбокс для коллизий с игроком (уменьшенный размер)
+    add(
+      RectangleHitbox(
+        position: Vector2.zero(),
+        anchor: Anchor.center,
+        size: Vector2(128, 128), // Уменьшили с 128x128 до 64x64
+      ),
+    );
+
+    debugPrint('🌀 Teleporter created at $position -> $destination');
+    debugPrint('   Hitbox size: 64x64');
+  }
 
   @override
   void onInit() async {
-    debugPrint('🌀 Teleporter created at $position -> $destination');
-    await _loadAnimation();
+    // onInit больше не используем - всё в onLoad
   }
 
   Future<void> _loadAnimation() async {
-    // Загружаем анимацию телепорта (teleporter_idle_0000.png - teleporter_idle_0015.png)
+    // Загружаем idle анимацию (teleporter_idle_0000.png - teleporter_idle_0015.png)
     for (int i = 0; i <= 15; i++) {
       final frameName = 'teleporter_idle_${i.toString().padLeft(4, '0')}.png';
       final sprite = animator.getSprite(frameName);
       if (sprite != null) {
-        _animationFrames.add(sprite);
+        _idleFrames.add(sprite);
       }
     }
 
-    if (_animationFrames.isNotEmpty) {
-      await _updateSprite(0);
+    // Загружаем activate анимацию (teleporter_activate_0000.png - teleporter_activate_0015.png)
+    for (int i = 0; i <= 15; i++) {
+      final frameName =
+          'teleporter_activate_${i.toString().padLeft(4, '0')}.png';
+      final sprite = animator.getSprite(frameName);
+      if (sprite != null) {
+        _activateFrames.add(sprite);
+      }
+    }
+
+    // Если есть idle кадры - обновляем спрайт
+    if (_idleFrames.isNotEmpty) {
+      await _updateSprite(_idleFrames.first);
     }
   }
 
-  Future<void> _updateSprite(int frameIndex) async {
-    if (frameIndex >= _animationFrames.length) return;
-
-    final frame = _animationFrames[frameIndex];
+  Future<void> _updateSprite(TrimmedSprite frame) async {
     final pictureRecorder = ui.PictureRecorder();
     final canvas = ui.Canvas(pictureRecorder);
 
@@ -63,24 +97,68 @@ class Teleporter extends GameEntity {
     _currentSprite = Sprite(image);
   }
 
+  void _activateTeleporter() {
+    _isActivating = true;
+    _activationTimer = 0.5; // 0.5 секунды активации
+  }
+
   @override
   void onUpdate(double dt) {
     super.onUpdate(dt);
 
-    // Анимация
-    if (_animationFrames.isNotEmpty) {
-      _frameTime += dt;
-      if (_frameTime >= _frameDuration) {
-        _frameTime = 0;
-        _currentFrame = (_currentFrame + 1) % _animationFrames.length;
-        _updateSprite(_currentFrame);
+    // Обработка активации
+    if (_isActivating) {
+      _activationTimer -= dt;
+
+      if (_activationTimer <= 0) {
+        _isActivating = false;
+        // Возвращаемся к idle анимации
+        if (_idleFrames.isNotEmpty) {
+          _currentFrame = 0;
+          _updateSprite(_idleFrames.first);
+        }
+        return;
+      }
+
+      // Анимация активации
+      if (_activateFrames.isNotEmpty) {
+        _frameTime += dt;
+        if (_frameTime >= _frameDuration) {
+          _frameTime = 0;
+          _currentFrame = (_currentFrame + 1) % _activateFrames.length;
+          _updateSprite(_activateFrames[_currentFrame]);
+        }
+      }
+    } else {
+      // Idle анимация
+      if (_idleFrames.isNotEmpty) {
+        _frameTime += dt;
+        if (_frameTime >= _frameDuration) {
+          _frameTime = 0;
+          _currentFrame = (_currentFrame + 1) % _idleFrames.length;
+          _updateSprite(_idleFrames[_currentFrame]);
+        }
       }
     }
   }
 
   @override
-  void onTouch(PositionComponent other, Vector2 point, Vector2 impulse) {
-    final Player player = other as Player;
+  void onCollisionStart(
+    Set<Vector2> intersectionPoints,
+    PositionComponent other,
+  ) {
+    super.onCollisionStart(intersectionPoints, other);
+    debugPrint('🌀 Teleporter onCollisionStart with: ${other.runtimeType}');
+
+    if (other is Player) {
+      debugPrint('✅ Player touched teleporter! Teleporting to $destination');
+      _teleportPlayer(other);
+    } else {
+      debugPrint('⚠️ Collision with non-Player: ${other.runtimeType}');
+    }
+  }
+
+  void _teleportPlayer(Player player) {
     if (player.isDead) return;
 
     final now = DateTime.now().millisecondsSinceEpoch / 1000;
@@ -92,6 +170,9 @@ class Teleporter extends GameEntity {
       // Телепортируем игрока
       player.position = destination;
 
+      // Активируем эффект телепорта
+      _activateTeleporter();
+
       debugPrint('✨ Player teleported to $destination');
     }
   }
@@ -99,7 +180,7 @@ class Teleporter extends GameEntity {
   @override
   void render(Canvas canvas) {
     super.render(canvas);
-    _currentSprite?.render(canvas, position: Vector2.zero());
+    _currentSprite?.render(canvas, position: Vector2(-size.x / 2, -size.y / 2));
 
     // Визуализация для отладки
     final paint = Paint()

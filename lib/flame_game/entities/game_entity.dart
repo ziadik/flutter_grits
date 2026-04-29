@@ -5,7 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_grits/flame_game/game/world/game_world.dart';
 
 /// Базовый класс для всех игровых объектов (аналог EntityClass из JS)
-abstract class GameEntity extends PositionComponent with HasCollisionDetection {
+abstract class GameEntity extends PositionComponent
+    with HasCollisionDetection, CollisionCallbacks {
   final GameWorld gameWorld;
   String entityName = '';
   bool _isKilled = false;
