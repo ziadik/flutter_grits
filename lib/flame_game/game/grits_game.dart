@@ -118,8 +118,12 @@ class GritsGame extends FlameGame
       world: gameWorld,
     );
 
-    // Настраиваем следование за игроком
-    camera.follow(gameWorld.player);
+    // Настраиваем мгновенное слежение за игроком (без плавности)
+    camera.follow(
+      gameWorld.player,
+      // anchor: Anchor.center,
+      maxSpeed: 10000, // Максимально высокая скорость
+    );
 
     // Добавляем камеру в игру
     await add(camera);

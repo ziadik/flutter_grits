@@ -14,6 +14,7 @@ import 'package:flutter_grits/flame_game/models/player_animator.dart';
 import 'package:flutter_grits/flame_game/weapons/weapon_base.dart';
 import 'package:flutter_grits/flame_game/game/world/game_world.dart';
 import 'package:flutter_grits/flame_game/entities/game_entity.dart';
+import 'package:flutter_grits/flame_game/entities/teleporter.dart';
 
 class TrimmedSpriteAnimationComponent extends PositionComponent {
   List<TrimmedSprite> _frames = [];
@@ -592,9 +593,22 @@ class Player extends PositionComponent
 
   /// Проверка коллизии игрока с телепортером
   bool _checkCollisionWithTeleporter(dynamic teleporter, Vector2 testPosition) {
+    // Если уже телепортируемся в этом кадре - пропускаем
+    if (_isTeleporting) {
+      return false;
+    }
+
     // Получаем позицию и размер телепортёра
-    final telePos = (teleporter as PositionComponent).position;
-    final teleSize = (teleporter as PositionComponent).size;
+    final teleporterComp = teleporter as Teleporter;
+    final telePos = teleporterComp.position;
+    final teleSize = teleporterComp.size;
+
+    debugPrint(
+      '   🔍 Checking collision with teleporter at (${telePos.x.toStringAsFixed(0)}, ${telePos.y.toStringAsFixed(0)})',
+    );
+    debugPrint(
+      '   🎯 Player test position: (${testPosition.x.toStringAsFixed(0)}, ${testPosition.y.toStringAsFixed(0)}), Teleport destination: (${teleporterComp.destination.x.toStringAsFixed(0)}, ${teleporterComp.destination.y.toStringAsFixed(0)})',
+    );
 
     // Хитбокс игрока в тестовой позиции
     final playerLeft = testPosition.x - 24;
@@ -616,9 +630,68 @@ class Player extends PositionComponent
         playerBottom > teleTop;
 
     if (intersects) {
-      debugPrint('   ✅ Collision with teleporter!');
+      debugPrint('   ✅ Collision detected!');
+      // Вызываем телепортацию напрямую
+      _teleportTo(teleporterComp.destination);
     }
     return intersects;
+  }
+
+  /// Телепортация игрока
+  void _teleportTo(Vector2 destination) {
+    // Защита от повторной телепортации в том же кадре
+    if (_isTeleporting) {
+      debugPrint('   ⚠️ Already teleporting this frame, skipping');
+      return;
+    }
+
+    final now = DateTime.now().millisecondsSinceEpoch / 1000;
+
+    debugPrint('🌀 === TELEPORT ATTEMPT ===');
+    debugPrint(
+      '   Current position: (${position.x.toStringAsFixed(0)}, ${position.y.toStringAsFixed(0)})',
+    );
+    debugPrint(
+      '   Destination: (${destination.x.toStringAsFixed(0)}, ${destination.y.toStringAsFixed(0)})',
+    );
+
+    debugPrint('   🚀 EXECUTING TELEPORT');
+    final oldX = position.x;
+    final oldY = position.y;
+
+    // Устанавливаем флаг телепортации
+    _isTeleporting = true;
+
+    position.setFrom(destination);
+    lastTeleportPosition = Vector2(position.x, position.y);
+    _lastTeleportTime = now;
+
+    debugPrint(
+      '   OLD: (${oldX.toStringAsFixed(0)}, ${oldY.toStringAsFixed(0)})',
+    );
+    debugPrint(
+      '   NEW: (${position.x.toStringAsFixed(0)}, ${position.y.toStringAsFixed(0)})',
+    );
+    debugPrint('   ✨ TELEPORT COMPLETE');
+
+    // Сбрасываем флаг после телепортации (в следующем кадре)
+    Future.microtask(() {
+      _isTeleporting = false;
+    });
+  }
+
+  /// Принудительное обновление позиции камеры после телепортации
+  void _forceUpdateCamera() {
+    // Находим родительский компонент (GritsGame) и обновляем камеру
+    final parent = findParent<PositionComponent>();
+    if (parent != null) {
+      // Камера должна автоматически обновиться при следующем кадре
+      debugPrint(
+        '   📷 Parent component found, camera will update automatically',
+      );
+    } else {
+      debugPrint('   ⚠️ No parent component found, camera may lag');
+    }
   }
 
   @override
@@ -641,11 +714,10 @@ class Player extends PositionComponent
     // );
 
     // Визуализация хитбокса (зеленым, чтобы было видно)
-    final halfSize = 32.0; // Размер хитбокса 64x64
     canvas.drawRect(
       Rect.fromLTWH(32, 32, 64, 64),
       Paint()
-        ..color = Colors.green.withOpacity(0.5)
+        ..color = Colors.green.withValues(alpha: 0.5)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2,
     );
@@ -658,7 +730,7 @@ class Player extends PositionComponent
     canvas.drawRect(
       Rect.fromLTWH(0, 0, 128, 128),
       Paint()
-        ..color = Colors.red.withOpacity(0.3)
+        ..color = Colors.red.withValues(alpha: 0.3)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1,
     );
@@ -784,6 +856,10 @@ class Player extends PositionComponent
 
   // Для телепортации
   Vector2? lastTeleportPosition;
+  double _lastTeleportTime = 0;
+  static const double teleportCooldown = 1.0; // 1 секунда между телепортами
+  bool _isTeleporting =
+      false; // Флаг для предотвращения многократной телепортации
 
   // Для Quad Damage
   double _damageMultiplier = 1.0;

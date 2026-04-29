@@ -158,6 +158,11 @@ class Teleporter extends GameEntity {
     }
   }
 
+  void teleporterPlayer(Player player) {
+    debugPrint('✅ Player touched teleporter! Teleporting to $destination');
+    _teleportPlayer(player);
+  }
+
   void _teleportPlayer(Player player) {
     if (player.isDead) return;
 

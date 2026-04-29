@@ -427,15 +427,44 @@ class GameWorld extends World with HasCollisionDetection {
 
     // Парсим координаты (формат: "x,y" с точкой как разделителем)
     final destParts = destStr.split(',');
-    final destination = Vector2(
-      double.tryParse(destParts[0].trim()) ?? 0,
-      double.tryParse(destParts[1].trim()) ?? 0,
+    final destX = double.tryParse(destParts[0].trim()) ?? 0;
+    final destY = double.tryParse(destParts[1].trim()) ?? 0;
+
+    // Проверяем, являются ли координаты в тайлах (если значения маленькие < 100)
+    // Tiled: если destination задан как "75, 25" - это тайлы, нужно умножить на 64
+    // Если "4800, 1600" - это уже пиксели
+    final tileSize = 64.0;
+    Vector2 destination;
+
+    if (destX < 100 && destY < 100) {
+      // Скорее всего это координаты в тайлах
+      destination = Vector2(destX * tileSize, destY * tileSize);
+      debugPrint(
+        '🌀 Destination interpreted as TILE coordinates: ($destX, $destY)',
+      );
+      debugPrint(
+        '   Converted to PIXELS: (${destination.x.toStringAsFixed(0)}, ${destination.y.toStringAsFixed(0)})',
+      );
+    } else {
+      // Это уже пиксели
+      destination = Vector2(destX, destY);
+      debugPrint(
+        '🌀 Destination interpreted as PIXEL coordinates: (${destination.x.toStringAsFixed(0)}, ${destination.y.toStringAsFixed(0)})',
+      );
+    }
+
+    // Позиция телепортёра из Tiled уже в пикселях
+    final teleporterPos = Vector2(
+      obj.x + obj.width / 2,
+      obj.y + obj.height / 2,
     );
 
-    debugPrint('🌀 Loading teleporter: $destStr -> $destination');
+    debugPrint(
+      '🌀 Loading teleporter at ${teleporterPos.toString()} -> $destStr',
+    );
 
     final teleporter = Teleporter(
-      position: Vector2(obj.x + obj.width * 2 - 5, obj.y + obj.height * 2 - 10),
+      position: teleporterPos,
       destination: destination,
       animator: resourceManager.playerAnimator,
       gameWorld: this,
@@ -444,7 +473,9 @@ class GameWorld extends World with HasCollisionDetection {
     await teleporter.onLoad();
     add(teleporter);
     teleporters.add(teleporter);
-    debugPrint('✅ Teleporter loaded: ${teleporter.position} -> $destination');
+    debugPrint(
+      '✅ Teleporter loaded: ${teleporter.position.toString()} -> ${teleporter.destination.toString()}',
+    );
   }
 
   void _loadSpawnPoint(dynamic obj) {
