@@ -4,7 +4,7 @@ import 'package:flutter_grits/flame_game/entities/player.dart';
 
 /// Базовый класс для всех снарядов
 abstract class ProjectileBase extends PositionComponent
-    with HasCollisionDetection {
+    with CollisionCallbacks {
   final Player owner;
   final Vector2 direction;
   final double damage;

@@ -51,8 +51,8 @@ class Teleporter extends GameEntity {
       ),
     );
 
-    debugPrint('🌀 Teleporter created at $position -> $destination');
-    debugPrint('   Hitbox size: 64x64');
+    // debugPrint('🌀 Teleporter created at $position -> $destination');
+    // debugPrint('   Hitbox size: 64x64');
   }
 
   @override

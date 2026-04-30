@@ -10,6 +10,7 @@ import 'package:flutter_grits/flame_game/managers/resource_manager.dart';
 import 'package:flutter_grits/flame_game/managers/input_manager.dart';
 import 'package:flutter_grits/flame_game/components/health_bar_component.dart';
 import 'package:flutter_grits/flame_game/components/energy_bar_component.dart';
+import 'package:flutter_grits/flame_game/components/game_object_component.dart';
 import 'package:flutter_grits/flame_game/models/player_animator.dart';
 import 'package:flutter_grits/flame_game/weapons/weapon_base.dart';
 import 'package:flutter_grits/flame_game/game/world/game_world.dart';
@@ -136,8 +137,7 @@ class TrimmedSpriteAnimationComponent extends PositionComponent {
   }
 }
 
-class Player extends PositionComponent
-    with HasCollisionDetection, CollisionCallbacks {
+class Player extends PositionComponent with CollisionCallbacks {
   final ResourceManager resourceManager;
   final GameWorld gameWorld; // Добавляем ссылку на мир
   InputManager? inputManager;
@@ -154,7 +154,7 @@ class Player extends PositionComponent
   // Движение
   int _currLegAnimIndex = 2; // 2 = down
   bool walking = false;
-  double _walkSpeed = 200.0; // Было final, теперь изменяемое для Thrusters
+  double _walkSpeed = 600.0; // Было final, теперь изменяемое для Thrusters
   double faceAngleRadians = 0;
 
   // Анимации (загружаются из ResourceManager)
@@ -197,19 +197,27 @@ class Player extends PositionComponent
     await _createComponents();
     await _loadAnimations();
 
+    debugPrint('✅ Player onLoad: Creating hitbox');
+    debugPrint('   Player size: ${width}x${height}');
+    debugPrint('   Player position: $position');
+
     // Добавляем хитбокс для коллизий
-    add(
-      RectangleHitbox(
-        position: Vector2.zero(),
-        anchor: Anchor.center,
-        size: Vector2(64, 64),
-      ),
+    final hitbox = RectangleHitbox(
+      position: Vector2.zero(),
+      anchor: Anchor.center,
+      size: Vector2(48, 48),
     );
+
+    add(hitbox);
+    // debugPrint('✅ Player hitbox added! Size: 48x48');
+    // debugPrint('   Children count after hitbox: ${children.length}');
+
+    // debugPrint('   CollisionCallbacks: ${this is CollisionCallbacks}');
 
     // Устанавливаем высокий приоритет для отрисовки поверх стен
     priority = 10;
 
-    debugPrint('✅ Hitbox added to player, priority = 10');
+    // debugPrint('✅ Player onLoad COMPLETE');
   }
 
   Future<void> _createComponents() async {
@@ -539,35 +547,35 @@ class Player extends PositionComponent
     final movement = direction.normalized() * _walkSpeed * dt;
     final newPosition = position + movement;
 
-    // Проверяем границы карты
-    if (newPosition.x < 32 ||
-        newPosition.y < 32 ||
-        newPosition.x > gameWorld.mapWidth - 32 ||
-        newPosition.y > gameWorld.mapHeight - 32) {
-      return; // За пределами карты
-    }
+    // // Проверяем границы карты
+    // if (newPosition.x < 32 ||
+    //     newPosition.y < 32 ||
+    //     newPosition.x > gameWorld.mapWidth - 32 ||
+    //     newPosition.y > gameWorld.mapHeight - 32) {
+    //   return; // За пределами карты
+    // }
 
-    // Проверяем коллизии со стенами
-    bool hasCollision = false;
-    for (final block in gameWorld.collisionBlocks) {
-      if (_checkCollisionWithBlock(block, newPosition)) {
-        hasCollision = true;
-        break;
-      }
-    }
+    // // Проверяем коллизии со стенами
+    // bool hasCollision = false;
+    // for (final block in gameWorld.collisionBlocks) {
+    //   if (_checkCollisionWithBlock(block, newPosition)) {
+    //     hasCollision = true;
+    //     break;
+    //   }
+    // }
 
-    // Проверяем коллизии с телепортами (для триггера, не блокируем движение)
-    for (final teleporter in gameWorld.teleporters) {
-      if (_checkCollisionWithTeleporter(teleporter, newPosition)) {
-        debugPrint('🔔 Player near teleporter at ${teleporter.position}');
-        // НЕ блокируем движение - игрок может пройти сквозь телепорт
-      }
-    }
+    // // Проверяем коллизии с телепортами (для триггера, не блокируем движение)
+    // for (final teleporter in gameWorld.teleporters) {
+    //   if (_checkCollisionWithTeleporter(teleporter, newPosition)) {
+    //     debugPrint('🔔 Player near teleporter at ${teleporter.position}');
+    //     // НЕ блокируем движение - игрок может пройти сквозь телепорт
+    //   }
+    // }
 
     // Двигаем только если нет коллизий со стенами
-    if (!hasCollision) {
-      position = newPosition;
-    }
+    // if (!hasCollision) {
+    position = newPosition;
+    // }
   }
 
   /// Проверка коллизии игрока с коллизионным блоком
@@ -617,10 +625,17 @@ class Player extends PositionComponent
     final playerBottom = testPosition.y + 24;
 
     // Хитбокс телепортёра (центр)
-    final teleLeft = telePos.x - teleSize.x / 2;
-    final teleRight = telePos.x + teleSize.x / 2;
-    final teleTop = telePos.y - teleSize.y / 2;
-    final teleBottom = telePos.y + teleSize.y / 2;
+    final teleLeft = telePos.x - 64;
+    final teleRight = telePos.x + 64;
+    final teleTop = telePos.y - 64;
+    final teleBottom = telePos.y + 64;
+
+    // debugPrint(
+    //   '   📦 Player AABB: (${playerLeft.toStringAsFixed(0)}, ${playerTop.toStringAsFixed(0)}) - (${playerRight.toStringAsFixed(0)}, ${playerBottom.toStringAsFixed(0)})',
+    // );
+    // debugPrint(
+    //   '   📦 Teleporter AABB: (${teleLeft.toStringAsFixed(0)}, ${teleTop.toStringAsFixed(0)}) - (${teleRight.toStringAsFixed(0)}, ${teleBottom.toStringAsFixed(0)})',
+    // );
 
     // Проверяем пересечение
     final intersects =
@@ -629,8 +644,10 @@ class Player extends PositionComponent
         playerTop < teleBottom &&
         playerBottom > teleTop;
 
+    // debugPrint('   🤔 Intersects: $intersects');
+
     if (intersects) {
-      debugPrint('   ✅ Collision detected!');
+      // debugPrint('   ✅ Collision detected! intersects ${intersects}');
       // Вызываем телепортацию напрямую
       _teleportTo(teleporterComp.destination);
     }
@@ -641,21 +658,20 @@ class Player extends PositionComponent
   void _teleportTo(Vector2 destination) {
     // Защита от повторной телепортации в том же кадре
     if (_isTeleporting) {
-      debugPrint('   ⚠️ Already teleporting this frame, skipping');
+      // debugPrint('   ⚠️ Already teleporting this frame, skipping');
       return;
     }
 
     final now = DateTime.now().millisecondsSinceEpoch / 1000;
 
-    debugPrint('🌀 === TELEPORT ATTEMPT ===');
-    debugPrint(
-      '   Current position: (${position.x.toStringAsFixed(0)}, ${position.y.toStringAsFixed(0)})',
-    );
-    debugPrint(
-      '   Destination: (${destination.x.toStringAsFixed(0)}, ${destination.y.toStringAsFixed(0)})',
-    );
-
-    debugPrint('   🚀 EXECUTING TELEPORT');
+    // debugPrint('🌀 === TELEPORT ATTEMPT ===');
+    // debugPrint(
+    //   '   Current position: (${position.x.toStringAsFixed(0)}, ${position.y.toStringAsFixed(0)})',
+    // );
+    // debugPrint(
+    //   '   Destination: (${destination.x.toStringAsFixed(0)}, ${destination.y.toStringAsFixed(0)})',
+    // );
+    // debugPrint('   🚀 EXECUTING TELEPORT');
     final oldX = position.x;
     final oldY = position.y;
 
@@ -666,18 +682,21 @@ class Player extends PositionComponent
     lastTeleportPosition = Vector2(position.x, position.y);
     _lastTeleportTime = now;
 
-    debugPrint(
-      '   OLD: (${oldX.toStringAsFixed(0)}, ${oldY.toStringAsFixed(0)})',
-    );
-    debugPrint(
-      '   NEW: (${position.x.toStringAsFixed(0)}, ${position.y.toStringAsFixed(0)})',
-    );
-    debugPrint('   ✨ TELEPORT COMPLETE');
+    // debugPrint(
+    //   '   OLD: (${oldX.toStringAsFixed(0)}, ${oldY.toStringAsFixed(0)})',
+    // );
+    // debugPrint(
+    //   '   NEW: (${position.x.toStringAsFixed(0)}, ${position.y.toStringAsFixed(0)})',
+    // );
+    // debugPrint('   ✨ TELEPORT COMPLETE');
 
     // Сбрасываем флаг после телепортации (в следующем кадре)
     Future.microtask(() {
       _isTeleporting = false;
+      // debugPrint('   🔓 Teleport lock released, _isTeleporting = false');
     });
+
+    // debugPrint('   ⚡ _isTeleporting flag set to: $_isTeleporting');
   }
 
   /// Принудительное обновление позиции камеры после телепортации
@@ -918,12 +937,32 @@ class Player extends PositionComponent
     PositionComponent other,
   ) {
     super.onCollisionStart(intersectionPoints, other);
-    debugPrint('💥 Player collision with: ${other.runtimeType}');
+
+    debugPrint('💥 [Player] onCollisionStart called!');
+    debugPrint('   Player position: $position');
+    debugPrint('   Other type: ${other.runtimeType}');
+    debugPrint('   Other position: ${other.position}');
+    debugPrint('   Intersection points: $intersectionPoints');
 
     // Проверяем коллизии с GameEntity (включая Teleporter)
     if (other is GameEntity && !other.isKilled) {
-      debugPrint('   Calling onTouch on GameEntity: ${other.runtimeType}');
+      debugPrint('   ✅ GameEntity collision: ${other.runtimeType}');
       other.onTouch(this, intersectionPoints.first, Vector2.zero());
+    }
+
+    // Проверяем коллизии с GameObjectComponent (предметы)
+    if (other is GameObjectComponent) {
+      debugPrint('   ✅ GameObjectComponent collision: ${other.type}');
+      debugPrint('   Calling object\'s onCollisionStart...');
+      // Предмет должен сам обработать коллизию в своём onCollisionStart
+    }
+
+    // ✅ Проверяем коллизии с GameObjectComponent (предметы)
+    if (other is GameObjectComponent) {
+      debugPrint(
+        '   🎒 Player colliding with GameObjectComponent: ${other.type}',
+      );
+      // Предмет уже обработал коллизию в своём onCollisionStart
     }
   }
 

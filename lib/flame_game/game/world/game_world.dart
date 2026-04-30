@@ -4,24 +4,19 @@ import 'package:flame/collisions.dart';
 import 'package:flame/components.dart';
 import 'package:flame_tiled/flame_tiled.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_grits/flame_game/entities/player.dart';
 import 'package:flutter_grits/flame_game/managers/resource_manager.dart';
 import 'package:flutter_grits/flame_game/managers/input_manager.dart';
-import 'package:flutter_grits/flame_game/managers/sound_manager.dart';
 import 'package:flutter_grits/flame_game/systems/spawn_system.dart';
 import 'package:flutter_grits/flame_game/components/environment_component.dart';
 import 'package:flutter_grits/flame_game/components/game_object_component.dart';
-import 'package:flutter_grits/flame_game/entities/game_entity.dart';
-import 'package:flutter_grits/flame_game/entities/spawn_point.dart';
+// import 'package:flutter_grits/flame_game/entities/spawn_point.dart';
 import 'package:flutter_grits/flame_game/entities/teleporter.dart';
-// import 'package:flutter_grits/flame_game/entities/spawner.dart'; // Удалено
+// import 'package:flutter_grits/flame_game/game/grits_game.dart';
 import 'package:flutter_grits/flame_game/weapons/weapon_registry.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_grits/flame_game/effects/player_spawn_effect.dart';
 
-// Включаем HasCollisionDetection
-class GameWorld extends World with HasCollisionDetection {
+class GameWorld extends World {
   final ResourceManager resourceManager;
   final InputManager inputManager;
 
@@ -36,7 +31,7 @@ class GameWorld extends World with HasCollisionDetection {
   final List<EnvironmentComponent> spawners = [];
 
   // Игровые сущности (SpawnPoint, Teleporter, Spawner)
-  final List<SpawnPoint> spawnPoints = [];
+  // final List<SpawnPoint> spawnPoints = [];
   final List<Teleporter> teleporters = [];
   // final List<Spawner> entitySpawners = []; // Удалено - Spawner больше не используется
 
@@ -313,6 +308,7 @@ class GameWorld extends World with HasCollisionDetection {
           name: objName,
           properties: properties,
           animator: resourceManager.playerAnimator,
+          gameWorld: this, // ✅ Добавляем gameWorld
           size: Vector2(64, 64),
         );
 
@@ -353,14 +349,14 @@ class GameWorld extends World with HasCollisionDetection {
         _loadSpawnPoint(obj);
       }
       // Spawner предметов (HealthSpawner, EnergySpawner, QuadDamageSpawner)
-      else if (objType == 'Spawner' || objName.contains('Spawner')) {
+      else if (objType == 'Spawner' && objName.endsWith('Spawner')) {
         _loadItemSpawner(obj);
       }
     }
 
-    debugPrint(
-      '✅ Загружено сущностей - SpawnPoints: ${spawnPoints.length}, Teleporters: ${teleporters.length}, ItemSpawners: ${gameEntities.where((e) => e.type == GameObjectType.healthCanister || e.type == GameObjectType.energyCanister || e.type == GameObjectType.quadDamage).length}',
-    );
+    // debugPrint(
+    //   '✅ Загружено сущностей - SpawnPoints: ${spawnPoints.length}, Teleporters: ${teleporters.length}, ItemSpawners: ${gameEntities.where((e) => e.type == GameObjectType.healthCanister || e.type == GameObjectType.energyCanister || e.type == GameObjectType.quadDamage).length}',
+    // );
   }
 
   /// Загрузка спавнера предметов как визуального объекта
@@ -405,6 +401,7 @@ class GameWorld extends World with HasCollisionDetection {
       name: obj.name ?? 'Spawner',
       properties: properties,
       animator: resourceManager.playerAnimator,
+      gameWorld: this,
       size: Vector2(64, 64),
     );
 
@@ -493,16 +490,16 @@ class GameWorld extends World with HasCollisionDetection {
       }
     }
 
-    final spawnPoint = SpawnPoint(
-      position: Vector2(obj.x + obj.width / 2, obj.y + obj.height / 2),
-      team: team,
-      gameWorld: this,
-    );
+    // final spawnPoint = SpawnPoint(
+    //   position: Vector2(obj.x + obj.width / 2, obj.y + obj.height / 2),
+    //   team: team,
+    //   gameWorld: this,
+    // );
 
-    spawnPoint.onInit();
-    add(spawnPoint);
-    spawnPoints.add(spawnPoint);
-    debugPrint('🏃 SpawnPoint for team $team at ${spawnPoint.position}');
+    // spawnPoint.onInit();
+    // add(spawnPoint);
+    // spawnPoints.add(spawnPoint);
+    // debugPrint('🏃 SpawnPoint for team $team at ${spawnPoint.position}');
   }
 
   // void _loadSpawner(dynamic obj) {

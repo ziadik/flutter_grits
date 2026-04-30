@@ -1,5 +1,6 @@
 // lib/flame_game/entities/pickup.dart
 import 'dart:ui' as ui;
+import 'package:flame/collisions.dart';
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
@@ -25,6 +26,13 @@ class PickupItem extends GameEntity {
     required this.animator,
     required GameWorld gameWorld,
   }) : super(position: position, gameWorld: gameWorld, size: Vector2(48, 48));
+
+  @override
+  Future<void> onLoad() async {
+    await super.onLoad();
+    // Добавляем хитбокс для Flame Collision Detection
+    add(CircleHitbox(radius: 24, anchor: Anchor.center));
+  }
 
   @override
   void onInit() async {
@@ -96,10 +104,24 @@ class PickupItem extends GameEntity {
   }
 
   @override
+  void onCollisionStart(
+    Set<Vector2> intersectionPoints,
+    PositionComponent other,
+  ) {
+    super.onCollisionStart(intersectionPoints, other);
+
+    if (other is Player && !other.isDead) {
+      debugPrint('⚡ [Flame Collision] PickupItem touched by player!');
+      _applyEffect(other);
+      kill(); // Удаляем предмет после подбора
+    }
+  }
+
+  @override
   void onTouch(PositionComponent other, Vector2 point, Vector2 impulse) {
     if (other is Player && !other.isDead) {
       _applyEffect(other);
-      debugPrint('🎒 Pickup touched by player');
+      debugPrint('🎒 [Legacy onTouch] Pickup touched by player');
     }
   }
 

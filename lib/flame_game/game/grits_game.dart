@@ -29,7 +29,11 @@ import 'package:flutter_grits/main.dart' show navigatorKey;
 import 'package:flutter/material.dart' hide PointerMoveEvent;
 
 class GritsGame extends FlameGame
-    with KeyboardEvents, TapCallbacks, PointerMoveCallbacks {
+    with
+        KeyboardEvents,
+        TapCallbacks,
+        PointerMoveCallbacks,
+        HasCollisionDetection {
   final ResourceManager resourceManager;
   late InputManager inputManager;
   late GameWorld gameWorld;
