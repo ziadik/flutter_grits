@@ -202,7 +202,7 @@ class Player extends PositionComponent with CollisionCallbacks {
       RectangleHitbox(
         position: Vector2.zero(),
         anchor: Anchor.center,
-        size: Vector2(8, 8),
+        size: Vector2(48, 48),
       ),
     );
 
