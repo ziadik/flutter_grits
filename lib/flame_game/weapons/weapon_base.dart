@@ -146,9 +146,9 @@ abstract class WeaponBase {
       '${muzzleSpritePattern}',
     );
 
-    debugPrint(
-      '🔫 $displayName: Found ${muzzleSprites.length} muzzle sprites for pattern: $muzzleSpritePattern',
-    );
+    // debugPrint(
+    //   '🔫 $displayName: Found ${muzzleSprites.length} muzzle sprites for pattern: $muzzleSpritePattern',
+    // );
 
     if (muzzleSprites.isEmpty) {
       debugPrint(
@@ -170,9 +170,9 @@ abstract class WeaponBase {
 
     final muzzlePos = player.position + forward + side;
 
-    debugPrint(
-      '🔫 Muzzle flash - pos: $muzzlePos, dir: $direction, offset: $offset, angle: ${player.faceAngleRadians * 180 / pi}°',
-    );
+    // debugPrint(
+    //   '🔫 Muzzle flash - pos: $muzzlePos, dir: $direction, offset: $offset, angle: ${player.faceAngleRadians * 180 / pi}°',
+    // );
 
     final muzzle = MuzzleFlash(
       position: muzzlePos,

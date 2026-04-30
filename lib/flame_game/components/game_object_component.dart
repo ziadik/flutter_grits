@@ -47,17 +47,8 @@ class GameObjectComponent extends PositionComponent with CollisionCallbacks {
     await super.onLoad();
     await _loadSprite();
 
-    // debugPrint('📦 GameObjectComponent onLoad START: $type at $position');
-    // debugPrint('   Size: $size, Anchor: $anchor');
-
     // Добавляем хитбокс для коллизий
-    final hitbox = CircleHitbox(radius: size.x / 2, anchor: Anchor.center);
-
-    // debugPrint('   Creating hitbox: $hitbox');
-    add(hitbox);
-    // debugPrint('   Hitbox added! Children count: ${children.length}');
-
-    // debugPrint('📦 GameObjectComponent onLoad END: $type');
+    add(CircleHitbox(radius: size.x / 2, anchor: Anchor.center));
   }
 
   Future<void> _loadSprite() async {
@@ -126,7 +117,6 @@ class GameObjectComponent extends PositionComponent with CollisionCallbacks {
     }
   }
 
-  // ✅ Добавляем метод обработки коллизий
   @override
   void onCollisionStart(
     Set<Vector2> intersectionPoints,
@@ -134,18 +124,12 @@ class GameObjectComponent extends PositionComponent with CollisionCallbacks {
   ) {
     super.onCollisionStart(intersectionPoints, other);
 
-    // debugPrint('🎯 [GameObjectComponent] onCollisionStart called!');
-    // debugPrint('   Object type: $type');
-    // debugPrint('   Object position: $position');
-    // debugPrint('   Other type: ${other.runtimeType}');
-    // debugPrint('   Other position: ${other.position}');
-    // debugPrint('   Is collected: $_isCollected');
+    // Отладка коллизий: кто с кем столкнулся
+    debugPrint(
+      '🔥 COLLISION: GameObjectComponent ($type) ↔ ${other.runtimeType}',
+    );
 
-    // Игрок уже подобрал этот предмет — игнорируем
-    if (_isCollected) {
-      debugPrint('   ⚠️ Already collected, ignoring');
-      return;
-    }
+    if (_isCollected) return;
 
     if (other is Player && !other.isDead) {
       debugPrint('   ✅ Player detected! Applying effect...');

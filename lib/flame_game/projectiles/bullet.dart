@@ -76,9 +76,9 @@ class Bullet extends ProjectileBase {
     // Загружаем анимацию снаряда по паттерну
     final sprites = animator.getSpritesByPattern('${spritePattern}.*\\.png');
 
-    debugPrint(
-      '🔫 Bullet: Found ${sprites.length} sprites for pattern: ${spritePattern}.*\\.png',
-    );
+    // debugPrint(
+    //   '🔫 Bullet: Found ${sprites.length} sprites for pattern: ${spritePattern}.*\\.png',
+    // );
 
     if (sprites.isEmpty) {
       // Пробуем альтернативный поиск без расширения
@@ -104,12 +104,12 @@ class Bullet extends ProjectileBase {
         firstSprite.spriteSourceSize.width,
         firstSprite.spriteSourceSize.height,
       );
-      debugPrint('✅ Bullet size set to: ${size.x}x${size.y} from sprite');
+      // debugPrint('✅ Bullet size set to: ${size.x}x${size.y} from sprite');
 
       await _updateSprite(0);
-      debugPrint(
-        '✅ Bullet animation loaded: ${_animationFrames.length} frames',
-      );
+      // debugPrint(
+      //   '✅ Bullet animation loaded: ${_animationFrames.length} frames',
+      // );
     }
   }
 
@@ -200,6 +200,9 @@ class Bullet extends ProjectileBase {
     Set<Vector2> intersectionPoints,
     PositionComponent other,
   ) {
+    if (other is Player || other is Bullet) {
+      return;
+    }
     // Создаем взрыв при столкновении
     final explosion = ExplosionEffect(
       position: position,

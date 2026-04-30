@@ -48,14 +48,14 @@ class GameWorld extends World {
     await _loadMap();
     await _createCollisionBlocks(); // Создаем Hitbox'ы из слоя коллизий
 
-    // ТЕСТОВАЯ СТЕНА - красный квадрат для проверки коллизий
-    final testWall = RectangleComponent(
-      position: Vector2(1000, 1000),
-      size: Vector2(100, 100),
-      paint: Paint()..color = Colors.red,
-    );
-    testWall.add(RectangleHitbox());
-    add(testWall);
+    // // ТЕСТОВАЯ СТЕНА - красный квадрат для проверки коллизий
+    // final testWall = RectangleComponent(
+    //   position: Vector2(1000, 1000),
+    //   size: Vector2(100, 100),
+    //   paint: Paint()..color = Colors.red,
+    // );
+    // testWall.add(RectangleHitbox());
+    // add(testWall);
 
     await _createPlayer();
 
@@ -413,7 +413,6 @@ class GameWorld extends World {
   }
 
   Future<void> _loadTeleporter(dynamic obj) async {
-    // Получаем свойство destination
     String destStr = '0,0';
     for (final prop in obj.properties) {
       if (prop.name == 'destination') {
@@ -422,42 +421,22 @@ class GameWorld extends World {
       }
     }
 
-    // Парсим координаты (формат: "x,y" с точкой как разделителем)
     final destParts = destStr.split(',');
     final destX = double.tryParse(destParts[0].trim()) ?? 0;
     final destY = double.tryParse(destParts[1].trim()) ?? 0;
 
-    // Проверяем, являются ли координаты в тайлах (если значения маленькие < 100)
-    // Tiled: если destination задан как "75, 25" - это тайлы, нужно умножить на 64
-    // Если "4800, 1600" - это уже пиксели
     final tileSize = 64.0;
     Vector2 destination;
 
     if (destX < 100 && destY < 100) {
-      // Скорее всего это координаты в тайлах
       destination = Vector2(destX * tileSize, destY * tileSize);
-      debugPrint(
-        '🌀 Destination interpreted as TILE coordinates: ($destX, $destY)',
-      );
-      debugPrint(
-        '   Converted to PIXELS: (${destination.x.toStringAsFixed(0)}, ${destination.y.toStringAsFixed(0)})',
-      );
     } else {
-      // Это уже пиксели
       destination = Vector2(destX, destY);
-      debugPrint(
-        '🌀 Destination interpreted as PIXEL coordinates: (${destination.x.toStringAsFixed(0)}, ${destination.y.toStringAsFixed(0)})',
-      );
     }
 
-    // Позиция телепортёра из Tiled уже в пикселях
     final teleporterPos = Vector2(
       obj.x + obj.width * 2,
       obj.y + obj.height * 2,
-    );
-
-    debugPrint(
-      '🌀 Loading teleporter at ${teleporterPos.toString()} -> $destStr',
     );
 
     final teleporter = Teleporter(
@@ -470,9 +449,6 @@ class GameWorld extends World {
     await teleporter.onLoad();
     add(teleporter);
     teleporters.add(teleporter);
-    debugPrint(
-      '✅ Teleporter loaded: ${teleporter.position.toString()} -> ${teleporter.destination.toString()}',
-    );
   }
 
   void _loadSpawnPoint(dynamic obj) {
