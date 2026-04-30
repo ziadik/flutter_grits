@@ -455,8 +455,8 @@ class GameWorld extends World with HasCollisionDetection {
 
     // Позиция телепортёра из Tiled уже в пикселях
     final teleporterPos = Vector2(
-      obj.x + obj.width / 2,
-      obj.y + obj.height / 2,
+      obj.x + obj.width * 2,
+      obj.y + obj.height * 2,
     );
 
     debugPrint(

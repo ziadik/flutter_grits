@@ -603,12 +603,12 @@ class Player extends PositionComponent
     final telePos = teleporterComp.position;
     final teleSize = teleporterComp.size;
 
-    debugPrint(
-      '   🔍 Checking collision with teleporter at (${telePos.x.toStringAsFixed(0)}, ${telePos.y.toStringAsFixed(0)})',
-    );
-    debugPrint(
-      '   🎯 Player test position: (${testPosition.x.toStringAsFixed(0)}, ${testPosition.y.toStringAsFixed(0)}), Teleport destination: (${teleporterComp.destination.x.toStringAsFixed(0)}, ${teleporterComp.destination.y.toStringAsFixed(0)})',
-    );
+    // debugPrint(
+    //   '   🔍 Checking collision with teleporter at (${telePos.x.toStringAsFixed(0)}, ${telePos.y.toStringAsFixed(0)})',
+    // );
+    // debugPrint(
+    //   '   🎯 Player test position: (${testPosition.x.toStringAsFixed(0)}, ${testPosition.y.toStringAsFixed(0)}), Teleport destination: (${teleporterComp.destination.x.toStringAsFixed(0)}, ${teleporterComp.destination.y.toStringAsFixed(0)})',
+    // );
 
     // Хитбокс игрока в тестовой позиции
     final playerLeft = testPosition.x - 24;
