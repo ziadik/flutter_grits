@@ -1,4 +1,5 @@
 // lib/flame_game/weapons/weapon_registry.dart
+import 'package:flutter_grits/flame_game/weapons/railgun.dart';
 import 'package:flutter_grits/flame_game/weapons/weapon_base.dart';
 import 'package:flutter_grits/flame_game/weapons/machine_gun.dart';
 import 'package:flutter_grits/flame_game/weapons/shot_gun.dart';
@@ -28,6 +29,7 @@ class WeaponRegistry {
     _weapons['Landmine'] = () => Landmine();
     _weapons['Sword'] = () => Sword();
     _weapons['Thrusters'] = () => Thrusters();
+    _weapons['Railgun'] = () => Railgun();
   }
 
   /// Создание оружия по имени

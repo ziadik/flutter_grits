@@ -233,6 +233,9 @@ class GameWorld extends World {
     // Слот 3: Особое оружие (RocketLauncher)
     player.setWeapon(2, WeaponRegistry.createWeapon('RocketLauncher'));
 
+    // Слот 4: Особое оружие (Railgun)
+    player.setWeapon(3, WeaponRegistry.createWeapon('Railgun'));
+
     // debugPrint('Weapons set: MachineGun, ShotGun, RocketLauncher');
   }
 

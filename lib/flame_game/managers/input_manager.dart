@@ -185,6 +185,9 @@ class InputManager {
     } else if (justPressed.contains(LogicalKeyboardKey.digit3) ||
         justPressed.contains(LogicalKeyboardKey.numpad3)) {
       return 2;
+    } else if (justPressed.contains(LogicalKeyboardKey.digit4) ||
+        justPressed.contains(LogicalKeyboardKey.numpad4)) {
+      return 3;
     }
 
     return null;

@@ -17,6 +17,7 @@ class WeaponIndicatorComponent extends PositionComponent {
   late TextComponent _slot1Label;
   late TextComponent _slot2Label;
   late TextComponent _slot3Label;
+  late TextComponent _slot4Label;
   late RectangleComponent _background;
   late RectangleComponent _selectionBorder;
 
@@ -24,7 +25,7 @@ class WeaponIndicatorComponent extends PositionComponent {
     required this.player,
     Vector2? position,
     Vector2? size,
-  }) : _size = size ?? Vector2(350, 50),
+  }) : _size = size ?? Vector2(450, 50),
        super(position: position ?? Vector2(20, 20), anchor: Anchor.topLeft);
 
   @override
@@ -86,6 +87,19 @@ class WeaponIndicatorComponent extends PositionComponent {
       text: '3: Empty',
     );
     await add(_slot3Label);
+    // Слот 4
+    _slot4Label = TextComponent(
+      position: Vector2(350, 18),
+      textRenderer: TextPaint(
+        style: const TextStyle(
+          fontSize: 10,
+          color: Colors.white,
+          fontWeight: FontWeight.normal,
+        ),
+      ),
+      text: '4: Empty',
+    );
+    await add(_slot4Label);
 
     // Подсветка выбранного слота (рамка снизу)
     _selectionBorder = RectangleComponent(
@@ -107,6 +121,7 @@ class WeaponIndicatorComponent extends PositionComponent {
     _slot1Label.text = _formatWeaponText(0);
     _slot2Label.text = _formatWeaponText(1);
     _slot3Label.text = _formatWeaponText(2);
+    _slot4Label.text = _formatWeaponText(3);
 
     // Обновить позицию рамки выделения
     _selectionBorder.position = Vector2(10 + (slot * 95), 38);

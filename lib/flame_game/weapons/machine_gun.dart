@@ -22,7 +22,7 @@ class MachineGun extends WeaponBase {
   String get itemID => "1234";
 
   @override
-  String get displayName => "Machine_Gun ";
+  String get displayName => "MG ";
 
   @override
   double get energyCost => 2;

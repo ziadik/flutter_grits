@@ -173,7 +173,7 @@ class Player extends PositionComponent with CollisionCallbacks {
   late TextComponent _nameLabel;
 
   // Оружие (3 слота как в JS коде) - опционально, не ломает существующую логику
-  final List<WeaponBase?> _weapons = [null, null, null];
+  final List<WeaponBase?> _weapons = [null, null, null, null];
   int _selectedWeaponSlot = 0; // По умолчанию слот 0
   bool _isFiringWeapon0 = false;
   bool _isFiringWeapon1 = false;
