@@ -105,27 +105,33 @@ class PlayerSpawnEffect extends PositionComponent {
     super.render(canvas);
 
     if (_currentSprite != null) {
-      canvas.save();
-      // Рисуем спрайт по центру
+      // anchor: Anchor.center уже центрирует компонент,
+      // поэтому рисуем спрайт в (0, 0) относительно центра компонента
       _currentSprite!.render(
         canvas,
-        position: Vector2(-size.x / 2, -size.y / 2),
+        position:
+            Vector2.zero(), // Убрали смещение - anchor делает центрирование
       );
-      canvas.restore();
     }
   }
 
   /// Метод для внешнего вызова - создать эффект спавна
-  static void spawn({
+  static Future<PlayerSpawnEffect> spawn({
     required Vector2 position,
     required PlayerAnimator animator,
     required GameWorld gameWorld,
-  }) {
+  }) async {
     final effect = PlayerSpawnEffect(
       position: position,
       animator: animator,
       gameWorld: gameWorld,
     );
-    // Эффект добавится в мир через onLoad()
+
+    // Ждём пока эффект загрузится и добавится в мир
+    await effect.onLoad();
+
+    debugPrint('🎉 PlayerSpawnEffect spawn() COMPLETE at $position');
+
+    return effect;
   }
 }

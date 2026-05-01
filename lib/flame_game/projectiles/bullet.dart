@@ -10,6 +10,7 @@ import 'package:flutter_grits/flame_game/models/player_animator.dart';
 import 'package:flutter_grits/flame_game/effects/explosion.dart';
 import 'package:flutter_grits/flame_game/managers/sound_manager.dart';
 import 'package:flutter_grits/flame_game/game/world/game_world.dart';
+import 'package:flutter_grits/flame_game/weapons/weapon_base.dart';
 
 /// Базовый снаряд для всех оружий
 class Bullet extends ProjectileBase {
@@ -200,8 +201,14 @@ class Bullet extends ProjectileBase {
     Set<Vector2> intersectionPoints,
     PositionComponent other,
   ) {
-    if (other is Player || other is Bullet) {
+    if (other is Player || other is WeaponBase || other is Bullet) {
       return;
+    }
+
+    if (other is CollisionBlock) {
+      if (other.collisionFlags.contains('projectileignore')) {
+        return;
+      }
     }
     // Создаем взрыв при столкновении
     final explosion = ExplosionEffect(

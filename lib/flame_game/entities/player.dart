@@ -529,42 +529,34 @@ class Player extends PositionComponent with CollisionCallbacks {
     }
   }
 
-  /// Метод для движения с проверкой коллизий через Flame
+  /// Метод для движения с проверкой коллизий
   void move(Vector2 direction, double dt) {
     if (direction == Vector2.zero()) return;
 
     final movement = direction.normalized() * _walkSpeed * dt;
     final newPosition = position + movement;
 
-    // // Проверяем границы карты
-    // if (newPosition.x < 32 ||
-    //     newPosition.y < 32 ||
-    //     newPosition.x > gameWorld.mapWidth - 32 ||
-    //     newPosition.y > gameWorld.mapHeight - 32) {
-    //   return; // За пределами карты
-    // }
+    // Проверяем границы карты
+    if (newPosition.x < 32 ||
+        newPosition.y < 32 ||
+        newPosition.x > gameWorld.mapWidth - 32 ||
+        newPosition.y > gameWorld.mapHeight - 32) {
+      return; // За пределами карты
+    }
 
-    // // Проверяем коллизии со стенами
-    // bool hasCollision = false;
-    // for (final block in gameWorld.collisionBlocks) {
-    //   if (_checkCollisionWithBlock(block, newPosition)) {
-    //     hasCollision = true;
-    //     break;
-    //   }
-    // }
-
-    // // Проверяем коллизии с телепортами (для триггера, не блокируем движение)
-    // for (final teleporter in gameWorld.teleporters) {
-    //   if (_checkCollisionWithTeleporter(teleporter, newPosition)) {
-    //     debugPrint('🔔 Player near teleporter at ${teleporter.position}');
-    //     // НЕ блокируем движение - игрок может пройти сквозь телепорт
-    //   }
-    // }
+    // Проверяем коллизии со стенами (manual check для точной блокировки)
+    bool hasCollision = false;
+    for (final block in gameWorld.collisionBlocks) {
+      if (_checkCollisionWithBlock(block, newPosition)) {
+        hasCollision = true;
+        break;
+      }
+    }
 
     // Двигаем только если нет коллизий со стенами
-    // if (!hasCollision) {
-    position = newPosition;
-    // }
+    if (!hasCollision) {
+      position = newPosition;
+    }
   }
 
   /// Проверка коллизии игрока с коллизионным блоком
@@ -881,30 +873,32 @@ class Player extends PositionComponent with CollisionCallbacks {
     // Отладка коллизий: кто с кем столкнулся
     debugPrint('🔥 COLLISION: Player ↔ ${other.runtimeType}');
 
+    // Проверяем коллизии с CollisionBlock (стены)
+    if (other is CollisionBlock) {
+      debugPrint('   ⚠️ Player hit a wall at ${other.position}');
+      return;
+    }
+
     // Проверяем коллизии с GameEntity (включая Teleporter)
     if (other is GameEntity && !other.isKilled) {
+      debugPrint('   ✅ GameEntity collision: ${other.runtimeType}');
       other.onTouch(this, intersectionPoints.first, Vector2.zero());
+      return;
     }
 
     // Проверяем коллизии с GameObjectComponent (предметы)
-    if (other is GameObjectComponent) {
-      // Предмет сам обработает коллизию в своём onCollisionStart
-    }
-
-    // Проверяем коллизии с GameObjectComponent (предметы)
-    if (other is GameObjectComponent) {
-      debugPrint('   ✅ GameObjectComponent collision: ${other.type}');
-      debugPrint('   Calling object\'s onCollisionStart...');
-      // Предмет должен сам обработать коллизию в своём onCollisionStart
-    }
-
-    // ✅ Проверяем коллизии с GameObjectComponent (предметы)
     if (other is GameObjectComponent) {
       debugPrint(
         '   🎒 Player colliding with GameObjectComponent: ${other.type}',
       );
-      // Предмет уже обработал коллизию в своём onCollisionStart
     }
+  }
+
+  @override
+  void onCollisionEnd(PositionComponent other) {
+    super.onCollisionEnd(other);
+
+    debugPrint('🔚 COLLISION END: Player ↔ ${other.runtimeType}');
   }
 
   /// Обработка стрельбы из текущего оружия

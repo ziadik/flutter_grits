@@ -8,6 +8,7 @@ import 'package:flutter_grits/flame_game/entities/player.dart';
 import 'package:flutter_grits/flame_game/managers/resource_manager.dart';
 import 'package:flutter_grits/flame_game/managers/input_manager.dart';
 import 'package:flutter_grits/flame_game/systems/spawn_system.dart';
+import 'package:flutter_grits/flame_game/projectiles/projectile_base.dart';
 import 'package:flutter_grits/flame_game/components/environment_component.dart';
 import 'package:flutter_grits/flame_game/components/game_object_component.dart';
 // import 'package:flutter_grits/flame_game/entities/spawn_point.dart';
@@ -15,6 +16,34 @@ import 'package:flutter_grits/flame_game/entities/teleporter.dart';
 // import 'package:flutter_grits/flame_game/game/grits_game.dart';
 import 'package:flutter_grits/flame_game/weapons/weapon_registry.dart';
 import 'package:flutter_grits/flame_game/effects/player_spawn_effect.dart';
+
+/// Коллизионный блок с поддержкой флагов
+class CollisionBlock extends PositionComponent with CollisionCallbacks {
+  final List<String> collisionFlags;
+
+  CollisionBlock({
+    required super.position,
+    required super.size,
+    this.collisionFlags = const [],
+  });
+
+  bool hasFlag(String flag) => collisionFlags.contains(flag);
+
+  @override
+  Future<void> onLoad() async {
+    await super.onLoad();
+    add(RectangleHitbox());
+  }
+
+  @override
+  bool onComponentTypeCheck(PositionComponent other) {
+    // Если блок имеет флаг projectileignore - не сталкиваться с пулями
+    if (hasFlag('projectileignore') && other is ProjectileBase) {
+      return false;
+    }
+    return super.onComponentTypeCheck(other);
+  }
+}
 
 class GameWorld extends World {
   final ResourceManager resourceManager;
@@ -39,7 +68,7 @@ class GameWorld extends World {
   final List<GameObjectComponent> gameEntities = [];
 
   // Хранилище коллизионных блоков (публичное для отладки)
-  final List<PositionComponent> collisionBlocks = [];
+  final List<CollisionBlock> collisionBlocks = [];
 
   GameWorld({required this.resourceManager, required this.inputManager});
 
@@ -96,12 +125,10 @@ class GameWorld extends World {
       // Упрощенный подход: создаем блоки для всех тайлов
       for (var x = 0; x < tileLayer.width; x++) {
         for (var y = 0; y < tileLayer.height; y++) {
-          // Создаем коллизионный блок для каждого тайла
-          final collisionBlock = PositionComponent(
+          final collisionBlock = CollisionBlock(
             position: Vector2(x * tileSize, y * tileSize),
             size: Vector2(tileSize, tileSize),
           );
-          collisionBlock.add(RectangleHitbox());
           add(collisionBlock);
           collisionBlocks.add(collisionBlock);
         }
@@ -115,13 +142,25 @@ class GameWorld extends World {
         block.priority = 0;
       }
     } else if (collisionLayer is ObjectGroup) {
-      // Для ObjectGroup - создаем блоки для каждого объекта
+      // Для ObjectGroup - создаем блоки для каждого объекта с поддержкой collisionFlags
       for (final obj in collisionLayer.objects) {
-        final collisionBlock = PositionComponent(
+        // Читаем свойство collisionFlags
+        final flags = <String>[];
+        for (final prop in obj.properties) {
+          if (prop.name == 'collisionFlags') {
+            final flagValue = prop.value.toString().trim();
+            if (flagValue.isNotEmpty) {
+              flags.add(flagValue);
+            }
+            break;
+          }
+        }
+
+        final collisionBlock = CollisionBlock(
           position: Vector2(obj.x, obj.y),
           size: Vector2(obj.width, obj.height),
+          collisionFlags: flags,
         );
-        collisionBlock.add(RectangleHitbox());
         add(collisionBlock);
         collisionBlocks.add(collisionBlock);
       }

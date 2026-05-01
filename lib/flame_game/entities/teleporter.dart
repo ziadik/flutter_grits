@@ -6,6 +6,7 @@ import 'package:flutter_grits/flame_game/entities/game_entity.dart';
 import 'package:flutter_grits/flame_game/entities/player.dart';
 import 'package:flutter_grits/flame_game/game/world/game_world.dart';
 import 'package:flutter_grits/flame_game/models/player_animator.dart';
+import 'package:flutter_grits/flame_game/effects/player_spawn_effect.dart';
 
 class Teleporter extends GameEntity {
   final Vector2 destination;
@@ -23,6 +24,10 @@ class Teleporter extends GameEntity {
   // Для предотвращения многократного телепорта
   final Map<Player, double> _lastTeleportTime = {};
   static const double teleportCooldown = 1.0;
+
+  // Для хранения игрока во время анимации
+  Player? _teleportingPlayer;
+  bool _isTeleporting = false;
 
   Teleporter({
     required Vector2 position,
@@ -98,8 +103,19 @@ class Teleporter extends GameEntity {
   }
 
   void _activateTeleporter() {
+    if (_activateFrames.isEmpty) {
+      debugPrint('⚠️ _activateFrames is empty!');
+      return;
+    }
+
     _isActivating = true;
     _activationTimer = 0.5; // 0.5 секунды активации
+    _currentFrame = 0; // Сброс на первый кадр анимации активации
+    _frameTime = 0;
+
+    debugPrint(
+      '🌀 Teleporter activated! Playing ${_activateFrames.length} frames',
+    );
   }
 
   @override
@@ -111,12 +127,9 @@ class Teleporter extends GameEntity {
       _activationTimer -= dt;
 
       if (_activationTimer <= 0) {
+        // Анимация завершена - телепортируем игрока
         _isActivating = false;
-        // Возвращаемся к idle анимации
-        if (_idleFrames.isNotEmpty) {
-          _currentFrame = 0;
-          _updateSprite(_idleFrames.first);
-        }
+        _completeTeleport();
         return;
       }
 
@@ -129,8 +142,8 @@ class Teleporter extends GameEntity {
           _updateSprite(_activateFrames[_currentFrame]);
         }
       }
-    } else {
-      // Idle анимация
+    } else if (!_isTeleporting) {
+      // Idle анимация (только если не телепортируем)
       if (_idleFrames.isNotEmpty) {
         _frameTime += dt;
         if (_frameTime >= _frameDuration) {
@@ -150,36 +163,77 @@ class Teleporter extends GameEntity {
     super.onCollisionStart(intersectionPoints, other);
     debugPrint('🌀 Teleporter onCollisionStart with: ${other.runtimeType}');
 
-    if (other is Player) {
-      debugPrint('✅ Player touched teleporter! Teleporting to $destination');
-      _teleportPlayer(other);
+    if (other is Player && !_isTeleporting) {
+      debugPrint(
+        '✅ Player touched teleporter! Starting activation animation...',
+      );
+      _startTeleportSequence(other);
     } else {
       debugPrint('⚠️ Collision with non-Player: ${other.runtimeType}');
     }
   }
 
   void teleporterPlayer(Player player) {
-    debugPrint('✅ Player touched teleporter! Teleporting to $destination');
-    _teleportPlayer(player);
+    debugPrint('✅ Player touched teleporter! Starting activation animation...');
+    _startTeleportSequence(player);
   }
 
-  void _teleportPlayer(Player player) {
+  void _startTeleportSequence(Player player) {
     if (player.isDead) return;
 
     final now = DateTime.now().millisecondsSinceEpoch / 1000;
     final lastTime = _lastTeleportTime[player] ?? 0;
 
-    if (now - lastTime >= teleportCooldown) {
-      _lastTeleportTime[player] = now;
-
-      // Телепортируем игрока
-      player.position = destination;
-
-      // Активируем эффект телепорта
-      _activateTeleporter();
-
-      debugPrint('✨ Player teleported to $destination');
+    if (now - lastTime < teleportCooldown) {
+      debugPrint('⚠️ Teleport cooldown active for player');
+      return;
     }
+
+    // Сохраняем игрока и запускаем анимацию
+    _teleportingPlayer = player;
+    _isTeleporting = true;
+    _lastTeleportTime[player] = now;
+
+    // Активируем анимацию
+    _activateTeleporter();
+
+    debugPrint(
+      '🌀 Teleport animation started, will teleport after animation completes',
+    );
+  }
+
+  void _completeTeleport() {
+    if (_teleportingPlayer == null) return;
+
+    final player = _teleportingPlayer!;
+
+    // Телепортируем игрока
+    player.position = destination;
+
+    debugPrint('✨ Player teleported to $destination');
+
+    // Показываем эффект появления игрока в точке назначения
+    _showSpawnEffect(player);
+
+    // Сбрасываем состояние
+    _teleportingPlayer = null;
+    _isTeleporting = false;
+
+    // Возвращаемся к idle анимации
+    if (_idleFrames.isNotEmpty) {
+      _currentFrame = 0;
+      _updateSprite(_idleFrames.first);
+      debugPrint('🌀 Teleporter back to idle animation');
+    }
+  }
+
+  Future<void> _showSpawnEffect(Player player) async {
+    await PlayerSpawnEffect.spawn(
+      position: destination,
+      animator: player.gameWorld.resourceManager.playerAnimator,
+      gameWorld: player.gameWorld,
+    );
+    debugPrint('🎉 Spawn effect shown at destination');
   }
 
   @override
