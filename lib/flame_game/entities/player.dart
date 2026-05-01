@@ -513,19 +513,19 @@ class Player extends PositionComponent with CollisionCallbacks {
         // Используем atan2 для правильного угла
         faceAngleRadians = atan2(directionToAim.y, directionToAim.x);
       }
+    }
+    // Если мышь не определена, используем направление движения (клавиатура)
+    else if (moveDir.length2 > 0.001) {
+      faceAngleRadians = atan2(moveDir.y, moveDir.x);
+    }
 
-      // Обновляем угол турели
-      _turretComponent.angle = faceAngleRadians;
+    // Обновляем угол турели
+    _turretComponent.angle = faceAngleRadians;
 
-      // Обновляем угол оружия на основе мыши (спрайт развернут на 180°)
-      final weaponComponent = _weaponComponent.children.firstOrNull;
-      if (weaponComponent is SpriteComponent) {
-        weaponComponent.angle = faceAngleRadians + pi;
-      }
-
-      // debugPrint(
-      //   '🎯 Direction: $directionToAim, Angle: ${faceAngleRadians * 180 / 3.14159}°',
-      // );
+    // Обновляем угол оружия на основе мыши (спрайт развернут на 180°)
+    final weaponComponent = _weaponComponent.children.firstOrNull;
+    if (weaponComponent is SpriteComponent) {
+      weaponComponent.angle = faceAngleRadians + pi;
     }
   }
 

@@ -22,6 +22,10 @@ class Bullet extends ProjectileBase {
   final double _frameDuration = 0.05; // 20 FPS для анимации снаряда
   double _rotationAngle = 0; // Угол поворота снаряда
 
+  // Защита от столкновения с владельцем при вылете
+  bool _ignoreOwner = true;
+  double _ignoreOwnerTimer = 0.2; // 0.2 секунды игнорирования владельца
+
   Bullet({
     required this.gameWorld,
     required super.position,
@@ -33,12 +37,14 @@ class Bullet extends ProjectileBase {
     String? spritePattern,
   }) : super(spritePattern: spritePattern ?? 'machinegun_projectile_') {
     // Размер снаряда зависит от типа оружия
-    if (spritePattern?.contains('rocket') ?? false) {
-      size = Vector2(16, 16);
+    if (spritePattern?.contains('rocket_launcher_projectile') ?? false) {
+      size = Vector2(114, 76);
+    } else if (spritePattern?.contains('shotun_projectile') ?? false) {
+      size = Vector2(56, 30);
     } else if (spritePattern?.contains('grenade') ?? false) {
-      size = Vector2(12, 12);
+      size = Vector2(16, 16);
     } else {
-      size = Vector2(8, 8);
+      size = Vector2(48, 46);
     }
 
     // Вычисляем угол поворота из направления полета
@@ -52,9 +58,7 @@ class Bullet extends ProjectileBase {
   Future<void> onLoad() async {
     await super.onLoad();
     await _loadAnimation();
-
-    // Добавляем хитбокс для коллизий
-    add(RectangleHitbox(size: size, anchor: Anchor.center));
+    // Хитбокс создаётся в ProjectileBase.onLoad() с правильными размерами
   }
 
   Future<void> _loadAnimation() async {
@@ -101,16 +105,20 @@ class Bullet extends ProjectileBase {
     if (_animationFrames.isNotEmpty) {
       // ✅ Автоматически устанавливаем размер из первого спрайта
       final firstSprite = _animationFrames.first;
-      size = Vector2(
+      final spriteSize = Vector2(
         firstSprite.spriteSourceSize.width,
         firstSprite.spriteSourceSize.height,
       );
-      // debugPrint('✅ Bullet size set to: ${size.x}x${size.y} from sprite');
+
+      // Обновляем размер компонента
+      size = spriteSize;
+
+      // ✅ Создаем хитбокс с правильным размером (вместо updateHitboxSize)
+      createHitbox(spriteSize);
+
+      debugPrint('✅ Bullet: size=${size.x}x${size.y}, hitbox created');
 
       await _updateSprite(0);
-      // debugPrint(
-      //   '✅ Bullet animation loaded: ${_animationFrames.length} frames',
-      // );
     }
   }
 
@@ -131,6 +139,14 @@ class Bullet extends ProjectileBase {
   @override
   void update(double dt) {
     super.update(dt);
+
+    // Уменьшаем таймер игнорирования владельца
+    if (_ignoreOwnerTimer > 0) {
+      _ignoreOwnerTimer -= dt;
+      if (_ignoreOwnerTimer <= 0) {
+        _ignoreOwner = false;
+      }
+    }
 
     // Анимация снаряда
     if (_animationFrames.isNotEmpty) {
@@ -194,6 +210,29 @@ class Bullet extends ProjectileBase {
       );
       canvas.restore();
     }
+
+    // ✅ Визуализация круглого хитбокса (синий круг)
+    if (hitbox is CircleHitbox) {
+      final circleHitbox = hitbox as CircleHitbox;
+      final radius = circleHitbox.radius;
+
+      canvas.save();
+      canvas.translate(size.x / 2, size.y / 2);
+      canvas.rotate(_rotationAngle);
+      canvas.translate(-size.x / 2, -size.y / 2);
+
+      // Рисуем круглый хитбокс
+      canvas.drawCircle(
+        Offset(size.x / 2, size.y / 2),
+        radius,
+        Paint()
+          ..color = Colors.blue.withValues(alpha: 0.5)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2,
+      );
+
+      canvas.restore();
+    }
   }
 
   @override
@@ -201,26 +240,70 @@ class Bullet extends ProjectileBase {
     Set<Vector2> intersectionPoints,
     PositionComponent other,
   ) {
-    if (other is Player || other is WeaponBase || other is Bullet) {
+    super.onCollisionStart(intersectionPoints, other);
+
+    // ✅ Игнорируем столкновение с игроком-владельцем в первые 0.2 сек после вылета
+    if (other is Player && other == owner && _ignoreOwner) {
+      debugPrint('   ⚠️ Bullet hit owner (ignore period) - ignoring');
       return;
     }
 
+    // ✅ Игнорируем столкновение с другими пулями
+    if (other is Bullet) {
+      debugPrint('   ⚠️ Bullet hit another bullet - ignoring');
+      return;
+    }
+
+    // ✅ Игнорируем стены с флагом projectileignore
     if (other is CollisionBlock) {
       if (other.collisionFlags.contains('projectileignore')) {
+        debugPrint('   ⚠️ Bullet hit projectileignore wall - ignoring');
         return;
       }
+
+      // ✅ СТОЛКНОВЕНИЕ СО СТЕННОЙ - создаем взрыв и уничтожаем пулю
+      final collisionPoint = intersectionPoints.isNotEmpty
+          ? intersectionPoints.first
+          : position;
+
+      debugPrint('   ✅ Bullet hit wall at $collisionPoint');
+
+      final explosion = ExplosionEffect(
+        position: collisionPoint,
+        animator: owner.resourceManager.playerAnimator,
+      );
+      gameWorld.add(explosion);
+      SoundManager().playSfx(SoundAssets.explode0);
+
+      destroy();
+      return;
     }
-    // Создаем взрыв при столкновении
-    final explosion = ExplosionEffect(
-      position: position,
-      animator: owner.resourceManager.playerAnimator,
-    );
-    gameWorld.add(explosion);
 
-    // Звук взрыва
-    SoundManager().playSfx(SoundAssets.explode0);
+    // ✅ СТОЛКНОВЕНИЕ С ИГРОКОМ - наносим урон и уничтожаем пулю
+    if (other is Player) {
+      final collisionPoint = intersectionPoints.isNotEmpty
+          ? intersectionPoints.first
+          : position;
 
-    destroy();
+      debugPrint('   ✅ Bullet hit Player at $collisionPoint');
+
+      // Наносим урон игроку
+      other.takeDamage(damage * owner.getDamageMultiplier());
+
+      // Создаем взрыв
+      final explosion = ExplosionEffect(
+        position: collisionPoint,
+        animator: owner.resourceManager.playerAnimator,
+      );
+      gameWorld.add(explosion);
+      SoundManager().playSfx(SoundAssets.explode0);
+
+      destroy();
+      return;
+    }
+
+    // ✅ Для других объектов - просто игнорируем
+    debugPrint('   ⚠️ Bullet hit ${other.runtimeType} - ignoring');
   }
 
   @override

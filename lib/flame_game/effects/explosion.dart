@@ -30,7 +30,8 @@ class ExplosionEffect extends PositionComponent {
   Future<void> _loadAnimation() async {
     // Загружаем анимацию взрыва
     for (int i = 0; i <= 29; i++) {
-      final frameName = 'landmine_explosion_large_${i.toString().padLeft(4, '0')}.png';
+      final frameName =
+          'landmine_explosion_large_${i.toString().padLeft(4, '0')}.png';
       final sprite = animator.getSprite(frameName);
       if (sprite != null) {
         _frames.add(sprite);
@@ -76,6 +77,11 @@ class ExplosionEffect extends PositionComponent {
   @override
   void render(Canvas canvas) {
     super.render(canvas);
-    _currentSprite?.render(canvas, position: Vector2.zero());
+
+    if (_currentSprite != null) {
+      // anchor: Anchor.center уже центрирует компонент,
+      // поэтому рисуем спрайт в (0, 0) относительно центра компонента
+      _currentSprite!.render(canvas, position: Vector2.zero());
+    }
   }
 }

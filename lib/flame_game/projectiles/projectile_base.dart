@@ -13,6 +13,9 @@ abstract class ProjectileBase extends PositionComponent
   double lifetime;
   final String spritePattern;
 
+  // Ссылка на хитбокс для обновления размера (ShapeHitbox - базовый класс для всех форм)
+  ShapeHitbox? hitbox;
+
   ProjectileBase({
     required super.position,
     required this.owner,
@@ -30,20 +33,33 @@ abstract class ProjectileBase extends PositionComponent
   Future<void> onLoad() async {
     await super.onLoad();
 
-    // Добавляем хитбокс с CollisionType.passive
-    // Пули не будут сталкиваться друг с другом, но будут попадать в игроков и объекты
-    final hitbox = RectangleHitbox(
-      position: Vector2.zero(),
-      anchor: Anchor.center,
-      size: size,
-    );
+    debugPrint('🔫 ProjectileBase onLoad: initial size=${size.x}x${size.y}');
+    // Хитбокс будет создан в Bullet._loadAnimation() с правильным размером
+  }
 
-    // ✅ КЛЮЧЕВОЙ МОМЕНТ: passive collisionType
-    // passive пули сталкиваются только с active объектами (игроки, враги),
-    // но не с другими passive пулями
-    hitbox.collisionType = CollisionType.passive;
+  /// Создать хитбокс с правильным размером (вызывается после загрузки спрайта)
+  void createHitbox(Vector2 hitboxSize) {
+    if (hitbox != null) return; // Уже создан
 
-    add(hitbox);
+    // ✅ Делаем круглый хитбокс с радиусом в 2 раза меньше размера спрайта
+    final radius =
+        (hitboxSize.x > hitboxSize.y ? hitboxSize.y : hitboxSize.x) / 4;
+
+    hitbox = CircleHitbox(radius: radius, anchor: Anchor.center)
+      ..isSolid = true;
+
+    hitbox!.collisionType = CollisionType.passive;
+    add(hitbox!);
+
+    debugPrint('🔫 ProjectileBase hitbox created: CircleHitbox radius=$radius');
+    debugPrint('   Component size: ${size.x}x${size.y}');
+  }
+
+  /// Обновить размер хитбокса (вызывается после загрузки спрайта)
+  void updateHitboxSize(Vector2 newSize) {
+    if (hitbox != null) {
+      hitbox!.size = newSize;
+    }
   }
 
   @override
@@ -55,7 +71,20 @@ abstract class ProjectileBase extends PositionComponent
 
     debugPrint('🔥 COLLISION: Bullet ↔ ${other.runtimeType}');
 
-    // Пуля уничтожается при попадании в любой объект
+    // ✅ Игнорируем столкновение с игроком-владельцем (чтобы не попасть в себя)
+    if (other is Player && other == owner) {
+      debugPrint('   ⚠️ Bullet hit owner - ignoring');
+      return;
+    }
+
+    // ✅ Игнорируем столкновение с другими пулями (хотя passive уже должно это обрабатывать)
+    if (other is ProjectileBase) {
+      debugPrint('   ⚠️ Bullet hit another bullet - ignoring');
+      return;
+    }
+
+    // ✅ Обрабатываем столкновение со стенами и другими объектами
+    debugPrint('   ✅ Bullet hit ${other.runtimeType} - destroying');
     destroy();
   }
 }

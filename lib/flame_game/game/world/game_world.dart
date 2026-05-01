@@ -25,14 +25,23 @@ class CollisionBlock extends PositionComponent with CollisionCallbacks {
     required super.position,
     required super.size,
     this.collisionFlags = const [],
-  });
+  }) : super(
+         anchor: Anchor.topLeft,
+       ); // ✅ Важно: anchor.topLeft для правильного совпадения хитбокса
 
   bool hasFlag(String flag) => collisionFlags.contains(flag);
 
   @override
   Future<void> onLoad() async {
     await super.onLoad();
-    add(RectangleHitbox());
+    // Хитбокс должен совпадать с размером и позицией блока
+    add(
+      RectangleHitbox(
+        position: Vector2.zero(),
+        anchor: Anchor.topLeft,
+        size: size,
+      ),
+    );
   }
 
   @override
