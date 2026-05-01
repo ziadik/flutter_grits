@@ -2,6 +2,7 @@ import 'package:flame/components.dart';
 import 'package:flame/collisions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_grits/flame_game/entities/player.dart';
+import 'package:flutter_grits/flame_game/game/world/game_world.dart';
 
 /// Базовый класс для всех снарядов
 abstract class ProjectileBase extends PositionComponent
@@ -53,38 +54,5 @@ abstract class ProjectileBase extends PositionComponent
 
     debugPrint('🔫 ProjectileBase hitbox created: CircleHitbox radius=$radius');
     debugPrint('   Component size: ${size.x}x${size.y}');
-  }
-
-  /// Обновить размер хитбокса (вызывается после загрузки спрайта)
-  void updateHitboxSize(Vector2 newSize) {
-    if (hitbox != null) {
-      hitbox!.size = newSize;
-    }
-  }
-
-  @override
-  void onCollisionStart(
-    Set<Vector2> intersectionPoints,
-    PositionComponent other,
-  ) {
-    super.onCollisionStart(intersectionPoints, other);
-
-    debugPrint('🔥 COLLISION: Bullet ↔ ${other.runtimeType}');
-
-    // ✅ Игнорируем столкновение с игроком-владельцем (чтобы не попасть в себя)
-    if (other is Player && other == owner) {
-      debugPrint('   ⚠️ Bullet hit owner - ignoring');
-      return;
-    }
-
-    // ✅ Игнорируем столкновение с другими пулями (хотя passive уже должно это обрабатывать)
-    if (other is ProjectileBase) {
-      debugPrint('   ⚠️ Bullet hit another bullet - ignoring');
-      return;
-    }
-
-    // ✅ Обрабатываем столкновение со стенами и другими объектами
-    debugPrint('   ✅ Bullet hit ${other.runtimeType} - destroying');
-    destroy();
   }
 }

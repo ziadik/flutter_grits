@@ -26,6 +26,9 @@ class Bullet extends ProjectileBase {
   bool _ignoreOwner = true;
   double _ignoreOwnerTimer = 0.2; // 0.2 секунды игнорирования владельца
 
+  // Флаг для предотвращения двойного уничтожения
+  bool _isDestroyed = false;
+
   Bullet({
     required this.gameWorld,
     required super.position,
@@ -240,7 +243,16 @@ class Bullet extends ProjectileBase {
     Set<Vector2> intersectionPoints,
     PositionComponent other,
   ) {
+    // ✅ СРОЧНАЯ ПРОВЕРКА - немедленно прерываем если уже уничтожена
+    if (_isDestroyed) {
+      return; // Без логов - это происходит каждый кадр
+    }
+
     super.onCollisionStart(intersectionPoints, other);
+
+    debugPrint(
+      '🔫 Bullet onCollisionStart with: ${other.runtimeType} at ${other.position}',
+    );
 
     // ✅ Игнорируем столкновение с игроком-владельцем в первые 0.2 сек после вылета
     if (other is Player && other == owner && _ignoreOwner) {
@@ -257,7 +269,9 @@ class Bullet extends ProjectileBase {
     // ✅ Игнорируем стены с флагом projectileignore
     if (other is CollisionBlock) {
       if (other.collisionFlags.contains('projectileignore')) {
-        debugPrint('   ⚠️ Bullet hit projectileignore wall - ignoring');
+        debugPrint(
+          '   ⚠️ Bullet hit projectileignore wall at ${other.position} - ignoring',
+        );
         return;
       }
 
@@ -266,7 +280,7 @@ class Bullet extends ProjectileBase {
           ? intersectionPoints.first
           : position;
 
-      debugPrint('   ✅ Bullet hit wall at $collisionPoint');
+      debugPrint('   ✅ Bullet hit WALL at $collisionPoint - DESTROYING');
 
       final explosion = ExplosionEffect(
         position: collisionPoint,
@@ -279,35 +293,21 @@ class Bullet extends ProjectileBase {
       return;
     }
 
-    // ✅ СТОЛКНОВЕНИЕ С ИГРОКОМ - наносим урон и уничтожаем пулю
-    if (other is Player) {
-      final collisionPoint = intersectionPoints.isNotEmpty
-          ? intersectionPoints.first
-          : position;
-
-      debugPrint('   ✅ Bullet hit Player at $collisionPoint');
-
-      // Наносим урон игроку
-      other.takeDamage(damage * owner.getDamageMultiplier());
-
-      // Создаем взрыв
-      final explosion = ExplosionEffect(
-        position: collisionPoint,
-        animator: owner.resourceManager.playerAnimator,
-      );
-      gameWorld.add(explosion);
-      SoundManager().playSfx(SoundAssets.explode0);
-
-      destroy();
-      return;
-    }
-
-    // ✅ Для других объектов - просто игнорируем
-    debugPrint('   ⚠️ Bullet hit ${other.runtimeType} - ignoring');
+    // ✅ Для ВСЕХ остальных объектов - игнорируем (только стены должны вызывать столкновение)
+    debugPrint(
+      '   ⚠️ Bullet hit ${other.runtimeType} - ignoring (NOT DESTROYING)',
+    );
   }
 
   @override
   void destroy() {
+    if (_isDestroyed) {
+      debugPrint('💥 Bullet.destroy() already called - ignoring');
+      return;
+    }
+
+    debugPrint('💥 Bullet.destroy() called!');
+    _isDestroyed = true;
     removeFromParent();
   }
 }
