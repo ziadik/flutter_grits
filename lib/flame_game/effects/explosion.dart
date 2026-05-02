@@ -6,6 +6,7 @@ import 'package:flutter_grits/flame_game/models/player_animator.dart';
 /// Эффект взрыва при попадании снаряда
 class ExplosionEffect extends PositionComponent {
   final PlayerAnimator animator;
+  final String impactSpritePattern; // ✅ Паттерн спрайтов взрыва
   List<TrimmedSprite> _frames = [];
   int _currentFrame = 0;
   double _frameTime = 0;
@@ -15,9 +16,11 @@ class ExplosionEffect extends PositionComponent {
   ExplosionEffect({
     required Vector2 position,
     required this.animator,
+    this.impactSpritePattern =
+        'landmine_explosion_large_', // ✅ Дефолтный паттерн
     Vector2? size,
   }) : super(position: position) {
-    this.size = size ?? Vector2(64, 64);
+    this.size = size ?? Vector2(128, 1283);
     anchor = Anchor.center;
   }
 
@@ -28,10 +31,10 @@ class ExplosionEffect extends PositionComponent {
   }
 
   Future<void> _loadAnimation() async {
-    // Загружаем анимацию взрыва
+    // ✅ Загружаем анимацию взрыва по переданному паттерну
     for (int i = 0; i <= 29; i++) {
       final frameName =
-          'landmine_explosion_large_${i.toString().padLeft(4, '0')}.png';
+          '${impactSpritePattern}${i.toString().padLeft(4, '0')}.png';
       final sprite = animator.getSprite(frameName);
       if (sprite != null) {
         _frames.add(sprite);

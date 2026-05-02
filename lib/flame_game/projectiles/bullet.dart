@@ -282,9 +282,14 @@ class Bullet extends ProjectileBase {
 
       debugPrint('   ✅ Bullet hit WALL at $collisionPoint - DESTROYING');
 
+      // ✅ Используем паттерн спрайтов взрыва из текущего оружия игрока
+      final impactPattern =
+          owner.selectedWeapon?.impactSpritePattern ??
+          'landmine_explosion_large_';
       final explosion = ExplosionEffect(
         position: collisionPoint,
         animator: owner.resourceManager.playerAnimator,
+        impactSpritePattern: impactPattern,
       );
       gameWorld.add(explosion);
       SoundManager().playSfx(SoundAssets.explode0);

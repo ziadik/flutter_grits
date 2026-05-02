@@ -1,10 +1,8 @@
 // lib/flame_game/weapons/railgun.dart
 import 'package:flame/components.dart';
-import 'package:flutter_grits/flame_game/projectiles/bullet.dart';
 import 'package:flutter_grits/flame_game/weapons/weapon_base.dart';
-
+import 'package:flutter_grits/flame_game/projectiles/railgun_beam.dart';
 import 'package:flutter_grits/flame_game/entities/player.dart';
-import 'package:flutter_grits/flame_game/managers/sound_manager.dart';
 import 'package:flutter/foundation.dart';
 
 /// Railgun (Электромагнитная пушка)
@@ -47,31 +45,33 @@ class Railgun extends WeaponBase {
 
   @override
   void onFire(Player player) {
+    debugPrint('🔦 Railgun firing!');
+
     // Получить направление стрельбы
     final direction = getFireDirection(player);
 
-    // Получить позицию спавна пули
-    final spawnPos = getBulletSpawnOffset(player, 20);
+    // Получить позицию спавна луча (от центра игрока)
+    final spawnPos = getBulletSpawnOffset(player, 40);
 
-    // Создать пулю
-    final bullet = Bullet(
-      gameWorld: player.gameWorld,
+    // Создать луч Railgun
+    final beam = RailgunBeam(
       position: spawnPos,
       owner: player,
       direction: direction,
       damage: damage,
-      speed: 900,
-      lifetime: 1.5,
-      spritePattern: projectileSpritePattern,
+      lifetime: 0.1, // Луч существует очень короткое время
     );
 
-    // Добавить пулю в игровой мир
-    addProjectileToWorld(bullet);
+    // Поворачиваем луч по направлению стрельбы
+    beam.angle = player.faceAngleRadians;
 
-    // Создать muzzle flash для chain gun (позиция дула: x=35, y=-3)
-    createMuzzleFlash(player, Vector2(32, 32));
+    // Добавить луч в игровой мир (через addEffectToWorld так как это не ProjectileBase)
+    addEffectToWorld(beam);
 
-    // Воспроизвести звук выстрела
-    SoundManager().playShootSound(SoundAssets.machineShoot0);
+    // Создать muzzle flash
+    createMuzzleFlash(player, Vector2(40, 0));
+
+    // Звук выстрела (если есть)
+    // SoundManager().playShootSound(SoundAssets.railgunShoot);
   }
 }
