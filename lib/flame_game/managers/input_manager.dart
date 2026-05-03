@@ -172,7 +172,7 @@ class InputManager {
     return _justPressedKeys;
   }
 
-  /// Проверить, была ли нажата цифра для смены оружия (1, 2, 3)
+  /// Проверить, была ли нажата цифра для смены оружия (1-6)
   int? getWeaponSlotKeyPress() {
     final justPressed = getJustPressedKeys();
 
@@ -188,6 +188,12 @@ class InputManager {
     } else if (justPressed.contains(LogicalKeyboardKey.digit4) ||
         justPressed.contains(LogicalKeyboardKey.numpad4)) {
       return 3;
+    } else if (justPressed.contains(LogicalKeyboardKey.digit5) ||
+        justPressed.contains(LogicalKeyboardKey.numpad5)) {
+      return 4;
+    } else if (justPressed.contains(LogicalKeyboardKey.digit6) ||
+        justPressed.contains(LogicalKeyboardKey.numpad6)) {
+      return 5;
     }
 
     return null;

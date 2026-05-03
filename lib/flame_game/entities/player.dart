@@ -172,8 +172,8 @@ class Player extends PositionComponent with CollisionCallbacks {
   late EnergyBarComponent _energyBar;
   late TextComponent _nameLabel;
 
-  // Оружие (3 слота как в JS коде) - опционально, не ломает существующую логику
-  final List<WeaponBase?> _weapons = [null, null, null, null];
+  // Оружие (6 слотов для всех оружий с иконками)
+  final List<WeaponBase?> _weapons = List<WeaponBase?>.filled(6, null);
   int _selectedWeaponSlot = 0; // По умолчанию слот 0
   bool _isFiringWeapon0 = false;
   bool _isFiringWeapon1 = false;
@@ -308,53 +308,34 @@ class Player extends PositionComponent with CollisionCallbacks {
 
   /// Обновить отображение оружия (вызывать при смене оружия)
   Future<void> updateWeaponSprite() async {
-    // debugPrint('=== updateWeaponSprite() called ===');
+    debugPrint('=== updateWeaponSprite() called ===');
 
     final weapon = selectedWeapon;
     if (weapon == null) {
-      // debugPrint('No weapon selected, clearing weapon component');
+      debugPrint('No weapon selected, clearing weapon component');
       _weaponComponent.removeAll(_weaponComponent.children.toList());
       return;
     }
 
-    // debugPrint('Weapon: ${weapon.displayName}');
-    // debugPrint('Sprite name: ${weapon.weaponSpriteName}');
+    debugPrint('Weapon: ${weapon.displayName}');
+    debugPrint('Sprite name: ${weapon.weaponSpriteName}');
 
     final animator = resourceManager.playerAnimator;
-    // debugPrint('Animator loaded: ${animator.isLoaded}');
+    debugPrint('Animator loaded: ${animator.isLoaded}');
 
     final weaponSprite = animator.getSprite(weapon.weaponSpriteName);
 
     if (weaponSprite == null) {
-      //   debugPrint('❌ Weapon sprite NOT FOUND: ${weapon.weaponSpriteName}');
-      //   debugPrint(
-      //     'Available sprites: ${animator.sprites.keys.take(10).toList()}',
-      //   );
+      debugPrint('❌ Weapon sprite NOT FOUND: ${weapon.weaponSpriteName}');
+      debugPrint(
+        'Available sprites: ${animator.sprites.keys.take(20).toList()}',
+      );
       return;
     }
 
-    // debugPrint('✅ Weapon sprite found!');
-    // debugPrint('Sprite size: ${weaponSprite.sprite.srcSize}');
-    // debugPrint('Using playerSize: $playerSize (128x128)');
-
-    // Отладка размеров спрайта
-    // debugPrint('=== SPRITE DEBUG ===');
-    // debugPrint('Sprite name: ${weapon.weaponSpriteName}');
-    // debugPrint(
-    //   'Raw sprite size: ${weaponSprite.sprite.srcSize.x}x${weaponSprite.sprite.srcSize.y}',
-    // );
-    // debugPrint('Trimmed: ${weaponSprite.trimmed}');
-    // if (weaponSprite.trimmed) {
-    //   debugPrint(
-    //     'Trimmed size: ${weaponSprite.spriteSourceSize.width}x${weaponSprite.spriteSourceSize.height}',
-    //   );
-    //   debugPrint(
-    //     'Source size: ${weaponSprite.sourceSize.width}x${weaponSprite.sourceSize.height}',
-    //   );
-    //   debugPrint(
-    //     'Frame position: ${weaponSprite.frame.left},${weaponSprite.frame.top}',
-    //   );
-    // }
+    debugPrint('✅ Weapon sprite found!');
+    debugPrint('Sprite size: ${weaponSprite.sprite.srcSize}');
+    debugPrint('Using playerSize: $playerSize (128x128)');
 
     // Удаляем старый компонент
     _weaponComponent.removeAll(_weaponComponent.children.toList());
@@ -382,7 +363,7 @@ class Player extends PositionComponent with CollisionCallbacks {
     weaponSpriteComponent.angle = faceAngleRadians + pi;
 
     _weaponComponent.add(weaponSpriteComponent);
-    // debugPrint('✅ Weapon sprite added successfully');
+    debugPrint('✅ Weapon sprite added successfully');
   }
 
   Future<void> _loadAnimations() async {
@@ -665,26 +646,20 @@ class Player extends PositionComponent with CollisionCallbacks {
     // );
 
     // Визуализация хитбокса (зеленым, чтобы было видно)
-    canvas.drawRect(
-      Rect.fromLTWH(32, 32, 64, 64),
-      Paint()
-        ..color = Colors.green.withValues(alpha: 0.5)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2,
-    );
+    // w
 
     // Точка центра
     // canvas.drawCircle(Offset.zero, 4, Paint()..color = Colors.yellow);
 
     // Визуализация размера спрайта (128x128) - красным
     //  final spriteHalfSize = 64.0;
-    canvas.drawRect(
-      Rect.fromLTWH(0, 0, 128, 128),
-      Paint()
-        ..color = Colors.red.withValues(alpha: 0.3)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1,
-    );
+    // canvas.drawRect(
+    //   Rect.fromLTWH(0, 0, 128, 128),
+    //   Paint()
+    //     ..color = Colors.red.withValues(alpha: 0.3)
+    //     ..style = PaintingStyle.stroke
+    //     ..strokeWidth = 1,
+    // );
   }
 
   void takeDamage(double amount) {
@@ -720,7 +695,8 @@ class Player extends PositionComponent with CollisionCallbacks {
   /// Установить оружие в слот
   void setWeapon(int slot, WeaponBase? weapon) {
     if (slot < 0 || slot >= _weapons.length) {
-      throw ArgumentError('Slot must be 0, 1, or 2');
+      debugPrint('⚠️ Invalid weapon slot: $slot (max: ${_weapons.length - 1})');
+      return;
     }
     _weapons[slot] = weapon;
     weapon?.onInit(this);

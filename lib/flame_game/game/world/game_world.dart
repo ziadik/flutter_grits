@@ -230,13 +230,21 @@ class GameWorld extends World {
     // Слот 2: Вторичное оружие (ShotGun)
     player.setWeapon(1, WeaponRegistry.createWeapon('ShotGun'));
 
-    // Слот 3: Особое оружие (RocketLauncher)
-    player.setWeapon(2, WeaponRegistry.createWeapon('RocketLauncher'));
+    // Слот 3: Chain Gun
+    player.setWeapon(2, WeaponRegistry.createWeapon('ChainGun'));
 
-    // Слот 4: Особое оружие (Railgun)
-    player.setWeapon(3, WeaponRegistry.createWeapon('Railgun'));
+    // Слот 4: Ракетница (RocketLauncher)
+    player.setWeapon(3, WeaponRegistry.createWeapon('RocketLauncher'));
 
-    // debugPrint('Weapons set: MachineGun, ShotGun, RocketLauncher');
+    // Слот 5: Гранатомёт (GrenadeLauncher)
+    player.setWeapon(4, WeaponRegistry.createWeapon('GrenadeLauncher'));
+
+    // Слот 6: Рейлган (Railgun)
+    player.setWeapon(5, WeaponRegistry.createWeapon('Railgun'));
+
+    debugPrint(
+      '✅ Weapons set: MachineGun, ShotGun, ChainGun, RocketLauncher, GrenadeLauncher, Railgun',
+    );
   }
 
   void _loadEnvironmentObjects() {

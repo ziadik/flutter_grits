@@ -225,14 +225,14 @@ class Bullet extends ProjectileBase {
       canvas.translate(-size.x / 2, -size.y / 2);
 
       // Рисуем круглый хитбокс
-      canvas.drawCircle(
-        Offset(size.x / 2, size.y / 2),
-        radius,
-        Paint()
-          ..color = Colors.blue.withValues(alpha: 0.5)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 2,
-      );
+      // canvas.drawCircle(
+      //   Offset(size.x / 2, size.y / 2),
+      //   radius,
+      //   Paint()
+      //     ..color = Colors.blue.withValues(alpha: 0.5)
+      //     ..style = PaintingStyle.stroke
+      //     ..strokeWidth = 2,
+      // );
 
       canvas.restore();
     }
