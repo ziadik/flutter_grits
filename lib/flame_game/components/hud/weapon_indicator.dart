@@ -20,12 +20,19 @@ class TrimmedSpriteComponent extends PositionComponent {
   @override
   void render(Canvas canvas) {
     if (trimmedSprite != null) {
+      canvas.save();
+      // Перемещаемся в центр компонента
+      canvas.translate(size.x / 2, size.y / 2);
+
+      // Рисуем спрайт с центром в (0,0)
       trimmedSprite!.renderCentered(
         canvas,
-        position,
+        Vector2.zero(),
         Size(size.x, size.y),
         paint,
       );
+
+      canvas.restore();
     }
   }
 }
@@ -78,7 +85,7 @@ class WeaponIndicatorComponent extends PositionComponent {
         ..color = Colors.black.withValues(alpha: 0.7)
         ..style = PaintingStyle.fill,
     );
-    await add(_background);
+    // await add(_background);
 
     // Создаём 6 слотов
     for (int i = 0; i < 6; i++) {
@@ -99,7 +106,7 @@ class WeaponIndicatorComponent extends PositionComponent {
       // Иконка оружия (изначально пустая)
       final icon = TrimmedSpriteComponent(
         trimmedSprite: null,
-        position: Vector2(x + (_slotWidth - _iconSize) / 2, 12),
+        position: Vector2(x - (_slotWidth - 128 / 2), 0),
         size: Vector2(_iconSize, _iconSize),
       );
       _slotIcons.add(icon);
@@ -130,7 +137,7 @@ class WeaponIndicatorComponent extends PositionComponent {
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2,
     );
-    await add(_selectionBorder);
+    // await add(_selectionBorder);
   }
 
   /// Обновить отображение (вызывать при смене оружия)
@@ -158,15 +165,16 @@ class WeaponIndicatorComponent extends PositionComponent {
       if (trimmedSprite != null) {
         // Устанавливаем спрайт
         icon.trimmedSprite = trimmedSprite;
-        // debugPrint(
-        //   '✅ Weapon icon set for slot $slotIndex: ${weapon.weaponSpriteName}',
-        // );
+        debugPrint(
+          '✅ Weapon icon set for slot $slotIndex: ${weapon.weaponSpriteName}',
+        );
+        debugPrint(
+          '   Sprite size: ${trimmedSprite.spriteSourceSize.width}x${trimmedSprite.spriteSourceSize.height}',
+        );
       } else {
         // Спрайт не найден
         icon.trimmedSprite = null;
-        debugPrint(
-          '⚠️ Weapon sprite not found for slot $slotIndex: ${weapon.weaponSpriteName}',
-        );
+        debugPrint('❌ Weapon sprite NOT FOUND: ${weapon.weaponSpriteName}');
       }
     } else {
       // Нет оружия
