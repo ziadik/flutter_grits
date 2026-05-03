@@ -29,7 +29,9 @@ flutter:
     - assets/images/grits_master.png
     - assets/tiles/small_map1.tmx
     - assets/tiles/map1.tmx
-
+    - assets/grits_interface.json
+    - assets/grits_interface.png
+    - assets/Weapons.json
     - assets/sounds/
     - assets/sounds/bg_game.ogg
     - assets/sounds/bg_menu.ogg
