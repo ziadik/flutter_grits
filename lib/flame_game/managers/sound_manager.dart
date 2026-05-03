@@ -1,6 +1,7 @@
 // lib/managers/sound_manager.dart
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_grits/managers/settings_manager.dart';
 
 /// Менеджер звуков для игры Grits
 class SoundManager {
@@ -12,14 +13,50 @@ class SoundManager {
   final Map<String, AudioPlayer> _sfxPlayers = {};
 
   bool _isMuted = false;
+  bool _sfxMuted = false;
   double _musicVolume = 0.5;
   double _sfxVolume = 0.7;
+
+  // Флаг для веба: звук разрешен после взаимодействия
+  bool _webAudioAllowed = false;
 
   String? _currentBgMusic;
 
   /// Инициализация (вызывать при старте игры)
   Future<void> init() async {
     await _bgPlayer.setVolume(_musicVolume);
+
+    // Загружаем настройки
+    await SettingsManager().loadSettings();
+
+    // Применяем настройки
+    _isMuted = !SettingsManager().musicEnabled;
+    _sfxMuted = !SettingsManager().sfxEnabled;
+    _musicVolume = SettingsManager().musicVolume;
+    _sfxVolume = SettingsManager().sfxVolume;
+
+    await _bgPlayer.setVolume(_musicVolume * (_isMuted ? 0 : 1));
+
+    if (kIsWeb) {
+      _setupWebAudioResumption();
+    }
+  }
+
+  /// Настройка возобновления аудио на веб
+  void _setupWebAudioResumption() {
+    // Слушаем первое взаимодействие
+    Future.delayed(Duration(milliseconds: 100), () {
+      _webAudioAllowed = true;
+    });
+  }
+
+  /// Разрешить аудио после взаимодействия пользователя
+  void onUserInteraction() {
+    if (!_webAudioAllowed) {
+      _webAudioAllowed = true;
+      // Пробуем запустить фоновую музыку после первого взаимодействия
+      playBackgroundMusic(SoundAssets.bgGame);
+    }
   }
 
   /// Фоновая музыка
@@ -37,12 +74,6 @@ class SoundManager {
     }
   }
 
-  /// Остановить фоновую музыку
-  Future<void> stopBackgroundMusic() async {
-    await _bgPlayer.stop();
-    _currentBgMusic = null;
-  }
-
   /// Пауза фоновой музыки
   Future<void> pauseBackgroundMusic() async {
     await _bgPlayer.pause();
@@ -57,7 +88,9 @@ class SoundManager {
 
   /// Воспроизвести звуковой эффект
   Future<void> playSfx(String filename, {double volume = 1.0}) async {
-    if (_isMuted) return;
+    if (_isMuted || _sfxMuted) return;
+    if (kIsWeb && !_webAudioAllowed)
+      return; // Не воспроизводим до взаимодействия
 
     try {
       final player = AudioPlayer();
@@ -69,25 +102,41 @@ class SoundManager {
         player.dispose();
       });
     } catch (e) {
-      // debugPrint('Error playing sound $filename: $e');
+      // Игнорируем ошибки
     }
   }
 
   /// Воспроизвести звук выстрела с учетом панорамирования
   Future<void> playShootSound(String filename, {double pan = 0.0}) async {
-    if (_isMuted) return;
+    if (_isMuted || _sfxMuted) return;
+    if (kIsWeb && !_webAudioAllowed)
+      return; // Не воспроизводим до взаимодействия
 
     try {
       final player = AudioPlayer();
       await player.setVolume(_sfxVolume);
-      // setPan недоступен в новой версии audioplayers
       await player.play(AssetSource('sounds/$filename'));
 
       player.onPlayerComplete.listen((event) {
         player.dispose();
       });
     } catch (e) {
-      // debugPrint('Error playing shoot sound $filename: $e');
+      // Игнорируем ошибки
+    }
+  }
+
+  /// Обновить состояние из настроек (вызывать при изменении настроек)
+  void updateFromSettings() {
+    final settings = SettingsManager();
+    _isMuted = !settings.musicEnabled;
+    _sfxMuted = !settings.sfxEnabled;
+    _musicVolume = settings.musicVolume;
+    _sfxVolume = settings.sfxVolume;
+
+    if (!_isMuted && _currentBgMusic != null) {
+      resumeBackgroundMusic();
+    } else if (_isMuted) {
+      pauseBackgroundMusic();
     }
   }
 

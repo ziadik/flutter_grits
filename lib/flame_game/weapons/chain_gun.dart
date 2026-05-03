@@ -56,11 +56,12 @@ class ChainGun extends WeaponBase {
 
     // Создать пулю
     final bullet = Bullet(
+      gameWorld: player.gameWorld,
       position: spawnPos,
       owner: player,
       direction: direction,
       damage: damage,
-      speed: 800,
+      speed: 900,
       lifetime: 1.5,
       spritePattern: projectileSpritePattern,
     );
@@ -69,7 +70,7 @@ class ChainGun extends WeaponBase {
     addProjectileToWorld(bullet);
 
     // Создать muzzle flash для chain gun (позиция дула: x=35, y=-3)
-    createMuzzleFlash(player, Vector2(35, -3));
+    createMuzzleFlash(player, Vector2(32, 32));
 
     // Воспроизвести звук выстрела
     SoundManager().playShootSound(SoundAssets.machineShoot0);

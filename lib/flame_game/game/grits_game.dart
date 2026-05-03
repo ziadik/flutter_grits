@@ -9,6 +9,7 @@ import 'package:flame/events.dart'
         TapCallbacks,
         TapDownEvent,
         TapUpEvent;
+
 import 'package:flame/src/events/messages/pointer_move_event.dart';
 import 'package:flutter/gestures.dart' hide PointerMoveEvent;
 import 'package:flutter/services.dart';
@@ -20,28 +21,56 @@ import 'package:flutter_grits/flame_game/game/world/game_world.dart';
 import 'package:flutter_grits/flame_game/components/hud/fps_counter.dart';
 import 'package:flutter_grits/flame_game/components/hud/minimap.dart';
 import 'package:flutter_grits/flame_game/components/hud/weapon_indicator.dart';
+import 'package:flutter_grits/flame_game/components/hud/settings_button.dart';
 import 'package:flutter_grits/flame_game/components/debug/collision_debug_overlay.dart';
 import 'package:flutter_grits/flame_game/components/crosshair.dart';
+import 'package:flutter_grits/flame_game/widgets/settings_dialog.dart';
+import 'package:flutter_grits/main.dart' show navigatorKey;
+import 'package:flutter/material.dart' hide PointerMoveEvent;
 
 class GritsGame extends FlameGame
     with
-        // HasCollisionDetection,
         KeyboardEvents,
-        // HoverCallbacks,
         TapCallbacks,
-        PointerMoveCallbacks {
+        PointerMoveCallbacks,
+        HasCollisionDetection {
   final ResourceManager resourceManager;
   late InputManager inputManager;
   late GameWorld gameWorld;
   CollisionDebugOverlay? _collisionDebugOverlay;
   bool _debugModeEnabled = false;
 
-  late Vector2 _mouseWorldPosition;
   late CrosshairComponent _crosshair;
   Vector2 _lastMouseScreenPos = Vector2.zero();
+  BuildContext? _gameContext;
+  SettingsButtonComponent? _settingsButton;
 
-  GritsGame({required this.resourceManager}) : super() {
-    _mouseWorldPosition = Vector2.zero();
+  GritsGame({required this.resourceManager}) : super();
+
+  /// Метод для показа диалога настроек из Flame компонента
+  void showSettingsDialog() {
+    _showSettingsDialog();
+  }
+
+  void _showSettingsDialog() {
+    // Используем глобальный navigatorKey для показа диалога
+    try {
+      Navigator.of(navigatorKey.currentContext!, rootNavigator: true).push(
+        MaterialPageRoute(
+          builder: (_) => Scaffold(
+            backgroundColor: Colors.transparent,
+            body: Center(child: SettingsDialog(onClosed: () {})),
+          ),
+        ),
+      );
+    } catch (e) {
+      debugPrint('⚠️ Error showing settings dialog: $e');
+    }
+  }
+
+  @override
+  void onMount() {
+    super.onMount();
   }
 
   @override
@@ -93,8 +122,12 @@ class GritsGame extends FlameGame
       world: gameWorld,
     );
 
-    // Настраиваем следование за игроком
-    camera.follow(gameWorld.player);
+    // Настраиваем мгновенное слежение за игроком (без плавности)
+    camera.follow(
+      gameWorld.player,
+      // anchor: Anchor.center,
+      maxSpeed: 10000, // Максимально высокая скорость
+    );
 
     // Добавляем камеру в игру
     await add(camera);
@@ -102,34 +135,45 @@ class GritsGame extends FlameGame
     // Настраиваем HUD после добавления камеры
     _setupHUD();
 
-    // Запускаем фоновую музыку
-    await SoundManager().playBackgroundMusic(SoundAssets.bgGame);
+    // Запускаем фоновую музыку только после первого взаимодействия пользователя
+    // SoundManager().playBackgroundMusic(SoundAssets.bgGame);
+    // Музыка запустится при первом клике/нажатии через onUserInteraction()
   }
 
   void _setupHUD() {
-    // FPS счетчик в правом верхнем углу
+    final screenSize = camera.viewport.size;
+
+    // FPS счетчик
     final fpsCounter = FpsCounterComponent(
-      position: Vector2(750, 30),
+      position: Vector2(screenSize.x - 50, 30),
       anchor: Anchor.topRight,
     );
     camera.viewport.add(fpsCounter);
 
-    // Мини-карта в левом нижнем углу
+    // Кнопка настроек (слева от FPS)
+    _settingsButton = SettingsButtonComponent(
+      onSettingsRequested: () {
+        // Показываем диалог через Overlay
+        _showSettingsDialog();
+      },
+      position: Vector2(screenSize.x - 90, 30),
+    );
+    camera.viewport.add(_settingsButton!);
+
+    // Мини-карта
     final minimap = MinimapComponent(
-      position: Vector2(20, 750),
+      position: Vector2(20, screenSize.y - 40),
       size: Vector2(180, 180),
       world: gameWorld,
       camera: camera,
     );
     camera.viewport.add(minimap);
 
-    // Индикатор оружия в левом верхнем углу
-    // Ждем немного пока игрок загрузится
+    // Индикатор оружия
     Future.delayed(const Duration(milliseconds: 100), () {
       if (gameWorld.player.isLoaded) {
         _addWeaponIndicator();
       } else {
-        // Если игрок еще не готов, пробуем позже
         gameWorld.player.onLoad().then((_) => _addWeaponIndicator());
       }
     });
@@ -154,6 +198,18 @@ class GritsGame extends FlameGame
     if (camera != null && camera.viewport is FixedSizeViewport) {
       (camera.viewport as FixedSizeViewport).size = newSize;
     }
+
+    // Обновляем позицию кнопки настроек при изменении размера экрана
+    if (_settingsButton?.isMounted ?? false) {
+      _settingsButton!.position = Vector2(newSize.x - 90, 30);
+    }
+  }
+
+  /// Получить BuildContext из Flutter widget tree
+  BuildContext? findGameWidgetContext() {
+    // Ищем через GameWidget глобальный ключ
+    // Это временное решение, можно улучшить через передачу контекста из main.dart
+    return null;
   }
 
   @override

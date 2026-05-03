@@ -22,7 +22,7 @@ class MachineGun extends WeaponBase {
   String get itemID => "1234";
 
   @override
-  String get displayName => "Machine_Gun ";
+  String get displayName => "Machine Gun";
 
   @override
   double get energyCost => 2;
@@ -57,12 +57,13 @@ class MachineGun extends WeaponBase {
     // debugPrint('   Fire direction: $direction');
     // debugPrint('   Muzzle pattern: $muzzleSpritePattern');
 
-    // Получить позицию спавна пули (смещение на 20px вперед)
-    final spawnPos = getBulletSpawnOffset(player, 20);
+    // Получить позицию спавна пули (смещение на 50px вперед - дальше от игрока)
+    final spawnPos = getBulletSpawnOffset(player, 50);
     // debugPrint('   Spawn position: $spawnPos');
 
     // Создать пулю
     final bullet = Bullet(
+      gameWorld: player.gameWorld,
       position: spawnPos,
       owner: player,
       direction: direction,

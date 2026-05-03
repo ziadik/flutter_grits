@@ -6,8 +6,7 @@ import 'package:flutter/material.dart';
 
 enum EnvironmentType { spawner, spawnPoint, pickup }
 
-class EnvironmentComponent extends PositionComponent
-    with HasCollisionDetection {
+class EnvironmentComponent extends PositionComponent with CollisionCallbacks {
   final EnvironmentType type;
   final String name;
   final Map<String, dynamic> properties;

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flame/input.dart';
 import 'package:vector_math/vector_math.dart';
 import 'package:flutter/material.dart';
+import 'sound_manager.dart';
 
 class InputManager {
   final Set<LogicalKeyboardKey> _pressedKeys = {};
@@ -76,6 +77,7 @@ class InputManager {
     if (event is KeyDownEvent) {
       _pressedKeys.add(event.logicalKey);
       _justPressedKeys.add(event.logicalKey);
+      _notifyUserInteraction(); // Веб: разрешаем звук
     } else if (event is KeyUpEvent) {
       _pressedKeys.remove(event.logicalKey);
     }
@@ -83,30 +85,35 @@ class InputManager {
 
   void handleMouseMove(Vector2 position) {
     _mousePosition = position;
-    // Не обновляем targetPosition автоматически
-    // Пусть это делает handleMousePress
-    // debugPrint('📍 Mouse moved to: $position');
+    _notifyUserInteraction(); // Веб: разрешаем звук
   }
 
   void handleMousePress(Vector2 position) {
-    // debugPrint('🎯 Mouse PRESS at: $position');
     _mousePressed = true;
     _targetPosition = position;
     _useMouseMovement = true;
     _isLeftMousePressed = true;
+    _notifyUserInteraction(); // Веб: разрешаем звук
   }
 
   void handleMouseButtonPress(int button) {
+    _notifyUserInteraction(); // Веб: разрешаем звук
     if (button == 1) {
-      // Левая кнопка
       _isLeftMousePressed = true;
     } else if (button == 2) {
-      // Правая кнопка
       _isRightMousePressed = true;
     } else if (button == 3) {
-      // Средняя кнопка
       _isMiddleMousePressed = true;
     }
+  }
+
+  void handleKeyboardAction() {
+    _notifyUserInteraction(); // Веб: разрешаем звук
+  }
+
+  void _notifyUserInteraction() {
+    // Уведомляем SoundManager о взаимодействии пользователя
+    SoundManager().onUserInteraction();
   }
 
   void handleMouseRelease() {
@@ -165,7 +172,7 @@ class InputManager {
     return _justPressedKeys;
   }
 
-  /// Проверить, была ли нажата цифра для смены оружия (1, 2, 3)
+  /// Проверить, была ли нажата цифра для смены оружия (1-6)
   int? getWeaponSlotKeyPress() {
     final justPressed = getJustPressedKeys();
 
@@ -178,6 +185,15 @@ class InputManager {
     } else if (justPressed.contains(LogicalKeyboardKey.digit3) ||
         justPressed.contains(LogicalKeyboardKey.numpad3)) {
       return 2;
+    } else if (justPressed.contains(LogicalKeyboardKey.digit4) ||
+        justPressed.contains(LogicalKeyboardKey.numpad4)) {
+      return 3;
+    } else if (justPressed.contains(LogicalKeyboardKey.digit5) ||
+        justPressed.contains(LogicalKeyboardKey.numpad5)) {
+      return 4;
+    } else if (justPressed.contains(LogicalKeyboardKey.digit6) ||
+        justPressed.contains(LogicalKeyboardKey.numpad6)) {
+      return 5;
     }
 
     return null;

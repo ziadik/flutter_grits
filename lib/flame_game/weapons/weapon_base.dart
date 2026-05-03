@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_grits/flame_game/entities/player.dart';
 import 'package:flutter_grits/flame_game/effects/muzzle_flash.dart';
 import 'package:flutter_grits/flame_game/game/world/game_world.dart';
+import 'package:flutter_grits/flame_game/projectiles/projectile_base.dart';
 
 /// Абстрактный базовый класс для всех видов оружия.
 ///
@@ -97,7 +98,9 @@ abstract class WeaponBase {
 
   /// Получить направление стрельбы от игрока
   Vector2 getFireDirection(Player player) {
-    return Vector2(cos(player.faceAngleRadians), sin(player.faceAngleRadians));
+    return player.getFireDirection(
+      player,
+    ); //Vector2(cos(player.faceAngleRadians), sin(player.faceAngleRadians));
   }
 
   /// Получить позицию спавна пули (смещение от игрока)
@@ -112,9 +115,9 @@ abstract class WeaponBase {
     final gameWorld = _owningPlayer?.findParent<GameWorld>();
     if (gameWorld != null) {
       gameWorld.add(projectile);
-      // debugPrint('✅ Projectile added to GameWorld at ${projectile.position}');
+      debugPrint('✅ Projectile added to GameWorld at ${projectile.position}');
     } else {
-      // debugPrint('❌ GameWorld not found for projectile!');
+      debugPrint('❌ GameWorld not found for projectile!');
     }
   }
 
@@ -132,7 +135,6 @@ abstract class WeaponBase {
   /// Создать эффект вспышки выстрела (muzzle flash)
   void createMuzzleFlash(Player player, Vector2 offset) {
     if (muzzleSpritePattern.isEmpty) {
-      // Fallback - простой muzzle flash без спрайтов
       createSimpleMuzzleFlash(player, offset);
       return;
     }
@@ -141,32 +143,42 @@ abstract class WeaponBase {
 
     // Получаем все спрайты для muzzle flash по паттерну
     final muzzleSprites = animator.getSpritesByPattern(
-      '${muzzleSpritePattern}.*\\.png',
+      '${muzzleSpritePattern}',
     );
 
     // debugPrint(
-    //   '🔫 Muzzle flash sprites for $displayName: ${muzzleSprites.length}',
+    //   '🔫 $displayName: Found ${muzzleSprites.length} muzzle sprites for pattern: $muzzleSpritePattern',
     // );
 
     if (muzzleSprites.isEmpty) {
-      // Если спрайты не найдены, используем простой fallback
-      // debugPrint('⚠️ No muzzle flash sprites found for $displayName');
+      debugPrint(
+        '⚠️ No muzzle flash sprites found for $displayName, using fallback',
+      );
       createSimpleMuzzleFlash(player, offset);
       return;
     }
 
-    // Вычисляем позицию muzzle flash относительно игрока
-    final direction = getFireDirection(player);
-    final muzzlePos =
-        player.position +
-        direction * offset.x +
-        Vector2(-direction.y, direction.x) * offset.y;
+    // Получаем направление стрельбы (единичный вектор)
+    final direction = player.getAimDirection();
+
+    // ✅ Правильное вычисление позиции muzzle flash:
+    // offset.x - расстояние по направлению выстрела (вперёд от центра игрока)
+    // offset.y - боковое смещение дула относительно центра игрока
+    // Используем левый перпендикуляр (direction.y, -direction.x) для корректной работы с отрицательными значениями Y
+    final forward = direction * offset.x;
+    final side = Vector2(direction.y, -direction.x) * offset.y;
+
+    final muzzlePos = player.position + forward + side;
+
+    // debugPrint(
+    //   '🔫 Muzzle flash - pos: $muzzlePos, dir: $direction, offset: $offset, angle: ${player.faceAngleRadians * 180 / pi}°',
+    // );
 
     final muzzle = MuzzleFlash(
       position: muzzlePos,
       frames: muzzleSprites,
       frameDuration: 0.05,
-      size: Vector2(64, 64),
+      size: Vector2(48, 48),
       angle: player.faceAngleRadians,
     );
 
@@ -176,68 +188,18 @@ abstract class WeaponBase {
 
   /// Простой muzzle flash без спрайтов (fallback)
   void createSimpleMuzzleFlash(Player player, Vector2 offset) {
-    final direction = getFireDirection(player);
-    final muzzlePos =
-        player.position +
-        direction * offset.x +
-        Vector2(-direction.y, direction.x) * offset.y;
+    final direction = player.getAimDirection();
 
-    final flash = SimpleMuzzleFlash(position: muzzlePos);
+    final forward = direction * offset.x;
+    final side = Vector2(direction.y, -direction.x) * offset.y;
+    final muzzlePos = player.position + forward + side;
+
+    final flash = SimpleMuzzleFlash(
+      position: muzzlePos,
+      angle: player.faceAngleRadians,
+    );
     addEffectToWorld(flash);
   }
 }
 
-/// Абстрактный базовый класс для снарядов
-abstract class ProjectileBase extends PositionComponent {
-  final Player owner;
-  final Vector2 direction;
-  final double damage;
-  final double speed;
-  double lifetime;
-  final double maxLifetime;
-  final String spritePattern; // Паттерн для загрузки спрайтов из JSON
-
-  ProjectileBase({
-    required Vector2 position,
-    required this.owner,
-    required this.direction,
-    required this.damage,
-    required this.speed,
-    required this.lifetime,
-    this.spritePattern = '',
-  }) : maxLifetime = lifetime,
-       super(position: position) {
-    size = Vector2(8, 8);
-    anchor = Anchor.center;
-  }
-
-  @override
-  void update(double dt) {
-    super.update(dt);
-
-    // Движение снаряда
-    position += direction.normalized() * speed * dt;
-
-    // Уменьшение времени жизни
-    lifetime -= dt;
-    if (lifetime <= 0) {
-      destroy();
-    }
-  }
-
-  /// Обработка коллизии
-  void onCollision(Vector2 collisionPoint, PositionComponent other) {
-    // Базовая реализация - ничего не делает
-  }
-
-  /// Уничтожение снаряда
-  void destroy() {
-    removeFromParent();
-  }
-
-  /// Проверка, является ли объект целью (не союзник)
-  bool isTarget(PositionComponent other) {
-    if (other is! Player) return true; // Стены, объекты - цели
-    return other.team != owner.team; // Только враги
-  }
-}
+/// Простой muzzle flash без спрайтов (для отладки)

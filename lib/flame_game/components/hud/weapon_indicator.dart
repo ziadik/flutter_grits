@@ -1,22 +1,99 @@
 // lib/flame_game/components/hud/weapon_indicator.dart
+import 'dart:ui' as ui;
 import 'package:flame/components.dart';
-import 'package:flame/text.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_grits/flame_game/entities/player.dart';
+import 'package:flutter_grits/flame_game/weapons/weapon_base.dart';
+
+/// Иконка оружия из grits_interface.png
+class WeaponIconComponent extends PositionComponent {
+  static const double _iconWidth = 48;
+  static const double _iconHeight = 48;
+
+  // Координаты иконок оружия из grits_interface.json
+  static const Map<String, Offset> _weaponIconPositions = {
+    'MachineGun': Offset(1322, 826),
+    'ShotGun': Offset(1322, 1026),
+    'ChainGun': Offset(1948, 994),
+    'RocketLauncher': Offset(1322, 926),
+    'GrenadeLauncher': Offset(1948, 1044),
+    'Railgun': Offset(1322, 876),
+    'Shield': Offset(1322, 976),
+    'Landmine': Offset(1948, 1094),
+    'Thrusters': Offset(1322, 1076),
+  };
+
+  ui.Image? _interfaceImage;
+  String? _currentWeaponName;
+
+  WeaponIconComponent({required super.position, required super.size});
+
+  Future<void> loadInterfaceImage() async {
+    final bytes = await rootBundle.load('assets/grits_interface.png');
+    final codec = await ui.instantiateImageCodec(bytes.buffer.asUint8List());
+    final frame = await codec.getNextFrame();
+    _interfaceImage = frame.image;
+  }
+
+  void setWeaponIcon(String weaponName) {
+    _currentWeaponName = weaponName;
+  }
+
+  void clearIcon() {
+    _currentWeaponName = null;
+  }
+
+  @override
+  void render(Canvas canvas) {
+    if (_interfaceImage == null) {
+      debugPrint('❌ WeaponIconComponent: interface image not loaded');
+      return;
+    }
+    if (_currentWeaponName == null) {
+      debugPrint('❌ WeaponIconComponent: no weapon name set');
+      return;
+    }
+
+    final offset = _weaponIconPositions[_currentWeaponName];
+    if (offset == null) {
+      debugPrint(
+        '❌ WeaponIconComponent: no icon position for $_currentWeaponName',
+      );
+      return;
+    }
+
+    debugPrint(
+      '🖼️ Rendering icon: $_currentWeaponName at (${offset.dx}, ${offset.dy})',
+    );
+
+    // Рисуем часть спрайт-листа
+    final srcRect = Rect.fromLTWH(
+      offset.dx,
+      offset.dy,
+      _iconWidth,
+      _iconHeight,
+    );
+
+    final destRect = Rect.fromLTWH(0, 0, size.x, size.y);
+
+    canvas.drawImageRect(_interfaceImage!, srcRect, destRect, Paint());
+  }
+}
 
 /// Индикатор текущего оружия в HUD
-///
-/// Отображает:
-/// - Номера слотов (1, 2, 3)
-/// - Названия оружия во всех слотах
-/// - Выделенный слот (подсветка)
 class WeaponIndicatorComponent extends PositionComponent {
   final Player player;
   final Vector2 _size;
 
-  late TextComponent _slot1Label;
-  late TextComponent _slot2Label;
-  late TextComponent _slot3Label;
+  static const double _iconSize = 48;
+  static const double _slotWidth = 65;
+  static const double _slotHeight = 45;
+
+  final List<WeaponIconComponent> _slotIcons = [];
+  final List<RectangleComponent> _slotBorders = [];
+  final List<TextComponent> _slotLabels = [];
+
   late RectangleComponent _background;
   late RectangleComponent _selectionBorder;
 
@@ -24,141 +101,147 @@ class WeaponIndicatorComponent extends PositionComponent {
     required this.player,
     Vector2? position,
     Vector2? size,
-  }) : _size = size ?? Vector2(350, 50),
+  }) : _size = size ?? Vector2(430, 58),
        super(position: position ?? Vector2(20, 20), anchor: Anchor.topLeft);
 
   @override
   Future<void> onLoad() async {
+    debugPrint('🔫 WeaponIndicatorComponent: onLoad started');
     await super.onLoad();
     await _createComponents();
+    debugPrint('🔫 WeaponIndicatorComponent: components created');
     await _updateDisplay();
+    debugPrint('🔫 WeaponIndicatorComponent: onLoad completed');
   }
 
   Future<void> _createComponents() async {
-    // Фон
     _background = RectangleComponent(
       size: _size,
       position: Vector2.zero(),
       paint: Paint()
-        ..color = Colors.black.withOpacity(0.7)
+        ..color = Colors.black.withValues(alpha: 0.7)
         ..style = PaintingStyle.fill,
     );
-    await add(_background);
+    // await add(_background);
 
-    // Слот 1
-    _slot1Label = TextComponent(
-      position: Vector2(10, 18),
-      textRenderer: TextPaint(
-        style: const TextStyle(
-          fontSize: 10,
-          color: Colors.white,
-          fontWeight: FontWeight.normal,
+    for (int i = 0; i < 6; i++) {
+      final x = 10 + (i * _slotWidth);
+
+      final border = RectangleComponent(
+        size: Vector2(_slotWidth - 5, _slotHeight),
+        position: Vector2(x, 5),
+        paint: Paint()
+          ..color = Colors.white.withValues(alpha: 0.3)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1,
+      );
+      _slotBorders.add(border);
+      await add(border);
+
+      final icon = WeaponIconComponent(
+        position: Vector2(x + (_slotWidth - _iconSize) / 2, 5),
+        size: Vector2(_iconSize, _iconSize),
+      );
+      await icon.loadInterfaceImage();
+      _slotIcons.add(icon);
+      await add(icon);
+
+      final label = TextComponent(
+        position: Vector2(x + 5, 3),
+        textRenderer: TextPaint(
+          style: const TextStyle(
+            fontSize: 10,
+            color: Colors.white70,
+            fontWeight: FontWeight.bold,
+          ),
         ),
-      ),
-      text: '1: Empty',
-    );
-    await add(_slot1Label);
+        text: '${i + 1}',
+      );
+      _slotLabels.add(label);
+      await add(label);
+    }
 
-    // Слот 2
-    _slot2Label = TextComponent(
-      position: Vector2(105, 18),
-      textRenderer: TextPaint(
-        style: const TextStyle(
-          fontSize: 10,
-          color: Colors.white,
-          fontWeight: FontWeight.normal,
-        ),
-      ),
-      text: '2: Empty',
-    );
-    await add(_slot2Label);
-
-    // Слот 3
-    _slot3Label = TextComponent(
-      position: Vector2(200, 18),
-      textRenderer: TextPaint(
-        style: const TextStyle(
-          fontSize: 10,
-          color: Colors.white,
-          fontWeight: FontWeight.normal,
-        ),
-      ),
-      text: '3: Empty',
-    );
-    await add(_slot3Label);
-
-    // Подсветка выбранного слота (рамка снизу)
     _selectionBorder = RectangleComponent(
-      size: Vector2(80, 6),
-      position: Vector2(5, 20),
+      size: Vector2(_slotWidth - 5, 4),
+      position: Vector2(10, 38),
       paint: Paint()
         ..color = Colors.blueAccent
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1,
+        ..strokeWidth = 2,
     );
-    await add(_selectionBorder);
+    // await add(_selectionBorder);
   }
 
-  /// Обновить отображение (вызывать при смене оружия)
   Future<void> _updateDisplay() async {
-    final slot = player.selectedWeaponSlot;
+    final selectedSlot = player.selectedWeaponSlot;
 
-    // Обновить все слоты
-    _slot1Label.text = _formatWeaponText(0);
-    _slot2Label.text = _formatWeaponText(1);
-    _slot3Label.text = _formatWeaponText(2);
+    for (int i = 0; i < 6; i++) {
+      final weapon = player.getWeapon(i);
+      _updateSlot(i, weapon, i == selectedSlot);
+    }
 
-    // Обновить позицию рамки выделения
-    _selectionBorder.position = Vector2(10 + (slot * 95), 38);
-
-    // Подсветка цветом текста выбранного слота
-    _updateSlotColors(slot);
+    _selectionBorder.position = Vector2(10 + (selectedSlot * _slotWidth), 38);
   }
 
-  String _formatWeaponText(int slotNum) {
-    final weapon = player.getWeapon(slotNum);
-    final color = slotNum == player.selectedWeaponSlot ? '🟡' : '';
-    return '${slotNum + 1}: ${weapon?.displayName ?? 'Empty'} $color';
+  void _updateSlot(int slotIndex, WeaponBase? weapon, bool isSelected) {
+    final icon = _slotIcons[slotIndex];
+
+    if (weapon != null) {
+      debugPrint('🔧 Slot $slotIndex: weapon="${weapon.displayName}"');
+      final weaponName = _getWeaponIconName(weapon.displayName);
+      debugPrint('🔧 Slot $slotIndex: iconName="$weaponName"');
+      if (weaponName != null) {
+        icon.setWeaponIcon(weaponName);
+        debugPrint('✅ Weapon icon set for slot $slotIndex: $weaponName');
+      } else {
+        icon.clearIcon();
+        debugPrint('❌ No icon mapping for: ${weapon.displayName}');
+      }
+    } else {
+      icon.clearIcon();
+      debugPrint('⚠️ Slot $slotIndex: no weapon');
+    }
+
+    final border = _slotBorders[slotIndex];
+    border.paint.color = isSelected
+        ? Colors.yellow.withValues(alpha: 0.8)
+        : Colors.white.withValues(alpha: 0.3);
+    border.paint.strokeWidth = isSelected ? 2 : 1;
   }
 
-  void _updateSlotColors(int selectedSlot) {
-    final color = selectedSlot == 0 ? Colors.yellow : Colors.white;
-    _slot1Label.textRenderer = TextPaint(
-      style: TextStyle(
-        fontSize: 14,
-        color: color,
-        fontWeight: selectedSlot == 0 ? FontWeight.bold : FontWeight.normal,
-      ),
-    );
-
-    final color2 = selectedSlot == 1 ? Colors.yellow : Colors.white;
-    _slot2Label.textRenderer = TextPaint(
-      style: TextStyle(
-        fontSize: 14,
-        color: color2,
-        fontWeight: selectedSlot == 1 ? FontWeight.bold : FontWeight.normal,
-      ),
-    );
-
-    final color3 = selectedSlot == 2 ? Colors.yellow : Colors.white;
-    _slot3Label.textRenderer = TextPaint(
-      style: TextStyle(
-        fontSize: 14,
-        color: color3,
-        fontWeight: selectedSlot == 2 ? FontWeight.bold : FontWeight.normal,
-      ),
-    );
+  String? _getWeaponIconName(String displayName) {
+    switch (displayName) {
+      case 'Machine Gun':
+        return 'MachineGun';
+      case 'Shot Gun':
+        return 'ShotGun';
+      case 'Chain Gun':
+        return 'ChainGun';
+      case 'Rocket Launcher':
+        return 'RocketLauncher';
+      case 'Grenade Launcher':
+        return 'GrenadeLauncher';
+      case 'Railgun':
+        return 'Railgun';
+      case 'Shield':
+        return 'Shield';
+      case 'Landmines':
+        return 'Landmine';
+      case 'Energy Sword':
+        return 'Shield'; // Используем offensive shield icon
+      case 'Thrusters':
+        return 'Thrusters';
+      default:
+        return null;
+    }
   }
 
   @override
   void update(double dt) {
     super.update(dt);
-
-    // Проверка на изменение выбранного оружия
     _updateDisplay();
   }
 
-  /// Получить компонент для добавления в игру
   static Future<WeaponIndicatorComponent> create({
     required Player player,
     Vector2? position,

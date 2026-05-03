@@ -23,7 +23,7 @@ class ShotGun extends WeaponBase {
   String get itemID => "8234";
 
   @override
-  String get displayName => "ShotGun";
+  String get displayName => "Shot Gun";
 
   @override
   double get energyCost => 4;
@@ -63,6 +63,7 @@ class ShotGun extends WeaponBase {
       final spawnPos = getBulletSpawnOffset(player, 20);
 
       final bullet = Bullet(
+        gameWorld: player.gameWorld,
         position: spawnPos,
         owner: player,
         direction: direction,

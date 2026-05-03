@@ -6,10 +6,7 @@ import 'package:flutter_grits/flame_game/weapons/chain_gun.dart';
 import 'package:flutter_grits/flame_game/weapons/rocket_launcher.dart';
 import 'package:flutter_grits/flame_game/weapons/grenade_launcher.dart';
 import 'package:flutter_grits/flame_game/weapons/shield.dart';
-import 'package:flutter_grits/flame_game/weapons/landmine.dart';
-import 'package:flutter_grits/flame_game/weapons/sword.dart';
-import 'package:flutter_grits/flame_game/weapons/thrusters.dart';
-// Импорты других оружий будут добавлены по мере реализации
+import 'package:flutter_grits/flame_game/weapons/railgun.dart';
 
 /// Factory для создания оружия по имени.
 ///
@@ -24,10 +21,7 @@ class WeaponRegistry {
     _weapons['ChainGun'] = () => ChainGun();
     _weapons['RocketLauncher'] = () => RocketLauncher();
     _weapons['GrenadeLauncher'] = () => GrenadeLauncher();
-    _weapons['Shield'] = () => Shield();
-    _weapons['Landmine'] = () => Landmine();
-    _weapons['Sword'] = () => Sword();
-    _weapons['Thrusters'] = () => Thrusters();
+    _weapons['Railgun'] = () => Railgun();
   }
 
   /// Создание оружия по имени

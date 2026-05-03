@@ -10,9 +10,12 @@ import 'package:flutter_grits/flame_game/managers/resource_manager.dart';
 import 'package:flutter_grits/flame_game/managers/input_manager.dart';
 import 'package:flutter_grits/flame_game/components/health_bar_component.dart';
 import 'package:flutter_grits/flame_game/components/energy_bar_component.dart';
+import 'package:flutter_grits/flame_game/components/game_object_component.dart';
 import 'package:flutter_grits/flame_game/models/player_animator.dart';
 import 'package:flutter_grits/flame_game/weapons/weapon_base.dart';
 import 'package:flutter_grits/flame_game/game/world/game_world.dart';
+import 'package:flutter_grits/flame_game/entities/game_entity.dart';
+import 'package:flutter_grits/flame_game/entities/teleporter.dart';
 
 class TrimmedSpriteAnimationComponent extends PositionComponent {
   List<TrimmedSprite> _frames = [];
@@ -134,8 +137,7 @@ class TrimmedSpriteAnimationComponent extends PositionComponent {
   }
 }
 
-class Player extends PositionComponent
-    with HasCollisionDetection, CollisionCallbacks {
+class Player extends PositionComponent with CollisionCallbacks {
   final ResourceManager resourceManager;
   final GameWorld gameWorld; // Добавляем ссылку на мир
   InputManager? inputManager;
@@ -152,7 +154,7 @@ class Player extends PositionComponent
   // Движение
   int _currLegAnimIndex = 2; // 2 = down
   bool walking = false;
-  double _walkSpeed = 200.0; // Было final, теперь изменяемое для Thrusters
+  double _walkSpeed = 600.0; // Было final, теперь изменяемое для Thrusters
   double faceAngleRadians = 0;
 
   // Анимации (загружаются из ResourceManager)
@@ -170,8 +172,8 @@ class Player extends PositionComponent
   late EnergyBarComponent _energyBar;
   late TextComponent _nameLabel;
 
-  // Оружие (3 слота как в JS коде) - опционально, не ломает существующую логику
-  final List<WeaponBase?> _weapons = [null, null, null];
+  // Оружие (6 слотов для всех оружий с иконками)
+  final List<WeaponBase?> _weapons = List<WeaponBase?>.filled(6, null);
   int _selectedWeaponSlot = 0; // По умолчанию слот 0
   bool _isFiringWeapon0 = false;
   bool _isFiringWeapon1 = false;
@@ -195,16 +197,16 @@ class Player extends PositionComponent
     await _createComponents();
     await _loadAnimations();
 
-    // ✅ Добавляем хитбокс для коллизий
+    // Добавляем хитбокс для коллизий
     add(
       RectangleHitbox(
         position: Vector2.zero(),
         anchor: Anchor.center,
-        size: Vector2(48, 48), // Чуть меньше спрайта для лучшего геймплея
+        size: Vector2(48, 48),
       ),
     );
 
-    debugPrint('✅ Hitbox added to player');
+    priority = 10;
   }
 
   Future<void> _createComponents() async {
@@ -306,53 +308,34 @@ class Player extends PositionComponent
 
   /// Обновить отображение оружия (вызывать при смене оружия)
   Future<void> updateWeaponSprite() async {
-    // debugPrint('=== updateWeaponSprite() called ===');
+    debugPrint('=== updateWeaponSprite() called ===');
 
     final weapon = selectedWeapon;
     if (weapon == null) {
-      // debugPrint('No weapon selected, clearing weapon component');
+      debugPrint('No weapon selected, clearing weapon component');
       _weaponComponent.removeAll(_weaponComponent.children.toList());
       return;
     }
 
-    // debugPrint('Weapon: ${weapon.displayName}');
-    // debugPrint('Sprite name: ${weapon.weaponSpriteName}');
+    debugPrint('Weapon: ${weapon.displayName}');
+    debugPrint('Sprite name: ${weapon.weaponSpriteName}');
 
     final animator = resourceManager.playerAnimator;
-    // debugPrint('Animator loaded: ${animator.isLoaded}');
+    debugPrint('Animator loaded: ${animator.isLoaded}');
 
     final weaponSprite = animator.getSprite(weapon.weaponSpriteName);
 
     if (weaponSprite == null) {
-      //   debugPrint('❌ Weapon sprite NOT FOUND: ${weapon.weaponSpriteName}');
-      //   debugPrint(
-      //     'Available sprites: ${animator.sprites.keys.take(10).toList()}',
-      //   );
+      debugPrint('❌ Weapon sprite NOT FOUND: ${weapon.weaponSpriteName}');
+      debugPrint(
+        'Available sprites: ${animator.sprites.keys.take(20).toList()}',
+      );
       return;
     }
 
-    // debugPrint('✅ Weapon sprite found!');
-    // debugPrint('Sprite size: ${weaponSprite.sprite.srcSize}');
-    // debugPrint('Using playerSize: $playerSize (128x128)');
-
-    // Отладка размеров спрайта
-    // debugPrint('=== SPRITE DEBUG ===');
-    // debugPrint('Sprite name: ${weapon.weaponSpriteName}');
-    // debugPrint(
-    //   'Raw sprite size: ${weaponSprite.sprite.srcSize.x}x${weaponSprite.sprite.srcSize.y}',
-    // );
-    // debugPrint('Trimmed: ${weaponSprite.trimmed}');
-    // if (weaponSprite.trimmed) {
-    //   debugPrint(
-    //     'Trimmed size: ${weaponSprite.spriteSourceSize.width}x${weaponSprite.spriteSourceSize.height}',
-    //   );
-    //   debugPrint(
-    //     'Source size: ${weaponSprite.sourceSize.width}x${weaponSprite.sourceSize.height}',
-    //   );
-    //   debugPrint(
-    //     'Frame position: ${weaponSprite.frame.left},${weaponSprite.frame.top}',
-    //   );
-    // }
+    debugPrint('✅ Weapon sprite found!');
+    debugPrint('Sprite size: ${weaponSprite.sprite.srcSize}');
+    debugPrint('Using playerSize: $playerSize (128x128)');
 
     // Удаляем старый компонент
     _weaponComponent.removeAll(_weaponComponent.children.toList());
@@ -380,7 +363,7 @@ class Player extends PositionComponent
     weaponSpriteComponent.angle = faceAngleRadians + pi;
 
     _weaponComponent.add(weaponSpriteComponent);
-    // debugPrint('✅ Weapon sprite added successfully');
+    debugPrint('✅ Weapon sprite added successfully');
   }
 
   Future<void> _loadAnimations() async {
@@ -511,23 +494,23 @@ class Player extends PositionComponent
         // Используем atan2 для правильного угла
         faceAngleRadians = atan2(directionToAim.y, directionToAim.x);
       }
+    }
+    // Если мышь не определена, используем направление движения (клавиатура)
+    else if (moveDir.length2 > 0.001) {
+      faceAngleRadians = atan2(moveDir.y, moveDir.x);
+    }
 
-      // Обновляем угол турели
-      _turretComponent.angle = faceAngleRadians;
+    // Обновляем угол турели
+    _turretComponent.angle = faceAngleRadians;
 
-      // Обновляем угол оружия на основе мыши (спрайт развернут на 180°)
-      final weaponComponent = _weaponComponent.children.firstOrNull;
-      if (weaponComponent is SpriteComponent) {
-        weaponComponent.angle = faceAngleRadians + pi;
-      }
-
-      // debugPrint(
-      //   '🎯 Direction: $directionToAim, Angle: ${faceAngleRadians * 180 / 3.14159}°',
-      // );
+    // Обновляем угол оружия на основе мыши (спрайт развернут на 180°)
+    final weaponComponent = _weaponComponent.children.firstOrNull;
+    if (weaponComponent is SpriteComponent) {
+      weaponComponent.angle = faceAngleRadians + pi;
     }
   }
 
-  /// Метод для движения с проверкой коллизий через Flame
+  /// Метод для движения с проверкой коллизий
   void move(Vector2 direction, double dt) {
     if (direction == Vector2.zero()) return;
 
@@ -542,10 +525,8 @@ class Player extends PositionComponent
       return; // За пределами карты
     }
 
-    // Проверяем коллизии с другими компонентами через Flame
+    // Проверяем коллизии со стенами (manual check для точной блокировки)
     bool hasCollision = false;
-
-    // Проверяем каждый коллизионный блок
     for (final block in gameWorld.collisionBlocks) {
       if (_checkCollisionWithBlock(block, newPosition)) {
         hasCollision = true;
@@ -553,7 +534,7 @@ class Player extends PositionComponent
       }
     }
 
-    // Двигаем только если нет коллизий
+    // Двигаем только если нет коллизий со стенами
     if (!hasCollision) {
       position = newPosition;
     }
@@ -580,6 +561,71 @@ class Player extends PositionComponent
         playerBottom > blockTop;
   }
 
+  /// Проверка коллизии игрока с телепортером
+  bool _checkCollisionWithTeleporter(dynamic teleporter, Vector2 testPosition) {
+    if (_isTeleporting) {
+      return false;
+    }
+
+    final teleporterComp = teleporter as Teleporter;
+    final telePos = teleporterComp.position;
+    final teleSize = teleporterComp.size;
+
+    final playerLeft = testPosition.x - 24;
+    final playerRight = testPosition.x + 24;
+    final playerTop = testPosition.y - 24;
+    final playerBottom = testPosition.y + 24;
+
+    final teleLeft = telePos.x - 64;
+    final teleRight = telePos.x + 64;
+    final teleTop = telePos.y - 64;
+    final teleBottom = telePos.y + 64;
+
+    final intersects =
+        playerLeft < teleRight &&
+        playerRight > teleLeft &&
+        playerTop < teleBottom &&
+        playerBottom > teleTop;
+
+    if (intersects) {
+      _teleportTo(teleporterComp.destination);
+    }
+    return intersects;
+  }
+
+  /// Телепортация игрока
+  void _teleportTo(Vector2 destination) {
+    if (_isTeleporting) {
+      return;
+    }
+
+    final oldX = position.x;
+    final oldY = position.y;
+
+    _isTeleporting = true;
+
+    position.setFrom(destination);
+    lastTeleportPosition = Vector2(position.x, position.y);
+
+    Future.microtask(() {
+      _isTeleporting = false;
+    });
+  }
+
+  /// Принудительное обновление позиции камеры после телепортации
+  void _forceUpdateCamera() {
+    // Находим родительский компонент (GritsGame) и обновляем камеру
+    final parent = findParent<PositionComponent>();
+    if (parent != null) {
+      // Камера должна автоматически обновиться при следующем кадре
+      debugPrint(
+        '   📷 Parent component found, camera will update automatically',
+      );
+    } else {
+      debugPrint('   ⚠️ No parent component found, camera may lag');
+    }
+  }
+
   @override
   void render(Canvas canvas) {
     super.render(canvas);
@@ -600,27 +646,20 @@ class Player extends PositionComponent
     // );
 
     // Визуализация хитбокса (зеленым, чтобы было видно)
-    final halfSize = 32.0; // Размер хитбокса 64x64
-    canvas.drawRect(
-      Rect.fromLTWH(32, 32, 64, 64),
-      Paint()
-        ..color = Colors.green.withOpacity(0.5)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2,
-    );
+    // w
 
     // Точка центра
     // canvas.drawCircle(Offset.zero, 4, Paint()..color = Colors.yellow);
 
     // Визуализация размера спрайта (128x128) - красным
     //  final spriteHalfSize = 64.0;
-    canvas.drawRect(
-      Rect.fromLTWH(0, 0, 128, 128),
-      Paint()
-        ..color = Colors.red.withOpacity(0.3)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1,
-    );
+    // canvas.drawRect(
+    //   Rect.fromLTWH(0, 0, 128, 128),
+    //   Paint()
+    //     ..color = Colors.red.withValues(alpha: 0.3)
+    //     ..style = PaintingStyle.stroke
+    //     ..strokeWidth = 1,
+    // );
   }
 
   void takeDamage(double amount) {
@@ -656,7 +695,8 @@ class Player extends PositionComponent
   /// Установить оружие в слот
   void setWeapon(int slot, WeaponBase? weapon) {
     if (slot < 0 || slot >= _weapons.length) {
-      throw ArgumentError('Slot must be 0, 1, or 2');
+      debugPrint('⚠️ Invalid weapon slot: $slot (max: ${_weapons.length - 1})');
+      return;
     }
     _weapons[slot] = weapon;
     weapon?.onInit(this);
@@ -741,6 +781,32 @@ class Player extends PositionComponent
   bool isSwordActive = false;
   bool isThrustersActive = false;
 
+  // Для телепортации
+  Vector2? lastTeleportPosition;
+  double _lastTeleportTime = 0;
+  static const double teleportCooldown = 1.0; // 1 секунда между телепортами
+  bool _isTeleporting =
+      false; // Флаг для предотвращения многократной телепортации
+
+  // Для Quad Damage
+  double _damageMultiplier = 1.0;
+  double _quadDamageEndTime = 0;
+
+  /// Активировать Quad Damage (4x урон на 10 секунд)
+  void activateQuadDamage() {
+    _damageMultiplier = 4.0;
+    _quadDamageEndTime = DateTime.now().millisecondsSinceEpoch / 1000 + 10.0;
+  }
+
+  /// Получить множитель урона
+  double getDamageMultiplier() {
+    final now = DateTime.now().millisecondsSinceEpoch / 1000;
+    if (now > _quadDamageEndTime) {
+      _damageMultiplier = 1.0;
+    }
+    return _damageMultiplier;
+  }
+
   /// Получить текущий выбранный слот оружия
   int get selectedWeaponSlot => _selectedWeaponSlot;
 
@@ -773,6 +839,44 @@ class Player extends PositionComponent
     }
   }
 
+  @override
+  void onCollisionStart(
+    Set<Vector2> intersectionPoints,
+    PositionComponent other,
+  ) {
+    super.onCollisionStart(intersectionPoints, other);
+
+    // Отладка коллизий: кто с кем столкнулся
+    debugPrint('🔥 COLLISION: Player ↔ ${other.runtimeType}');
+
+    // Проверяем коллизии с CollisionBlock (стены)
+    if (other is CollisionBlock) {
+      debugPrint('   ⚠️ Player hit a wall at ${other.position}');
+      return;
+    }
+
+    // Проверяем коллизии с GameEntity (включая Teleporter)
+    if (other is GameEntity && !other.isKilled) {
+      debugPrint('   ✅ GameEntity collision: ${other.runtimeType}');
+      other.onTouch(this, intersectionPoints.first, Vector2.zero());
+      return;
+    }
+
+    // Проверяем коллизии с GameObjectComponent (предметы)
+    if (other is GameObjectComponent) {
+      debugPrint(
+        '   🎒 Player colliding with GameObjectComponent: ${other.type}',
+      );
+    }
+  }
+
+  @override
+  void onCollisionEnd(PositionComponent other) {
+    super.onCollisionEnd(other);
+
+    debugPrint('🔚 COLLISION END: Player ↔ ${other.runtimeType}');
+  }
+
   /// Обработка стрельбы из текущего оружия
   void _handleFiring() {
     if (inputManager == null) return;
@@ -793,5 +897,22 @@ class Player extends PositionComponent
       // debugPrint('🔥 Calling tryFire for ${currentWeapon.displayName}');
       currentWeapon.tryFire(this);
     }
+  }
+
+  /// Получить направление взгляда (на мышь)
+  Vector2 getAimDirection() {
+    if (inputManager?.mousePosition != null) {
+      final directionToAim = inputManager!.mousePosition! - position;
+      if (directionToAim.length2 > 0.001) {
+        return directionToAim.normalized();
+      }
+    }
+    // Если мышь не определена, используем текущий угол
+    return Vector2(cos(faceAngleRadians), sin(faceAngleRadians));
+  }
+
+  /// Получить направление стрельбы от игрока
+  Vector2 getFireDirection(Player player) {
+    return getAimDirection();
   }
 }

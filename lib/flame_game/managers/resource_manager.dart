@@ -44,9 +44,41 @@ class ResourceManager {
       playerAnimator.loadFromJson(effectsData);
 
       _isLoaded = true;
+
+      // Проверка загрузки спрайтов оружия
+      _checkWeaponSprites();
     } catch (e) {
       // debugPrint('Error loading resources: $e');
       rethrow;
+    }
+  }
+
+  void _checkWeaponSprites() {
+    final weapons = [
+      {'name': 'MachineGun', 'sprite': 'machinegun.png'},
+      {'name': 'ShotGun', 'sprite': 'shotgun.png'},
+      {'name': 'ChainGun', 'sprite': 'chaingun.png'},
+      {'name': 'RocketLauncher', 'sprite': 'rocket_launcher.png'},
+      {'name': 'GrenadeLauncher', 'sprite': 'grenade_launcher.png'},
+      {'name': 'Railgun', 'sprite': 'railgun.png'},
+    ];
+
+    debugPrint('🔫 Checking weapon sprites...');
+    for (final weapon in weapons) {
+      final sprite = playerAnimator.getSprite(weapon['sprite']!);
+      if (sprite != null) {
+        debugPrint('  ✅ ${weapon['name']}: ${weapon['sprite']}');
+      } else {
+        debugPrint('  ❌ ${weapon['name']}: ${weapon['sprite']} NOT FOUND!');
+      }
+    }
+
+    // Проверка Shield (пассивное, не в слотах)
+    final shieldSprite = playerAnimator.getSprite('defensive_shield.png');
+    if (shieldSprite != null) {
+      debugPrint('  ✅ Shield (passive): defensive_shield.png');
+    } else {
+      debugPrint('  ❌ Shield (passive): defensive_shield.png NOT FOUND!');
     }
   }
 
