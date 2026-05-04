@@ -72,8 +72,7 @@ abstract class WeaponBase {
 
   /// Проверка возможности выстрела
   bool canFire(Player player) {
-    return player.energy >= energyCost &&
-        DateTime.now().millisecondsSinceEpoch / 1000 >= nextFireTime;
+    return player.energy >= energyCost && DateTime.now().millisecondsSinceEpoch / 1000 >= nextFireTime;
   }
 
   /// Потребление энергии при выстреле
@@ -90,17 +89,14 @@ abstract class WeaponBase {
 
     consumeEnergy(player);
     firing = true;
-    nextFireTime =
-        DateTime.now().millisecondsSinceEpoch / 1000 + fireDelayInSeconds;
+    nextFireTime = DateTime.now().millisecondsSinceEpoch / 1000 + fireDelayInSeconds;
 
     onFire(player);
   }
 
   /// Получить направление стрельбы от игрока
   Vector2 getFireDirection(Player player) {
-    return player.getFireDirection(
-      player,
-    ); //Vector2(cos(player.faceAngleRadians), sin(player.faceAngleRadians));
+    return player.getFireDirection(player); //Vector2(cos(player.faceAngleRadians), sin(player.faceAngleRadians));
   }
 
   /// Получить позицию спавна пули (смещение от игрока)
@@ -142,18 +138,14 @@ abstract class WeaponBase {
     final animator = player.resourceManager.playerAnimator;
 
     // Получаем все спрайты для muzzle flash по паттерну
-    final muzzleSprites = animator.getSpritesByPattern(
-      '${muzzleSpritePattern}',
-    );
+    final muzzleSprites = animator.getSpritesByPattern('${muzzleSpritePattern}');
 
     // debugPrint(
     //   '🔫 $displayName: Found ${muzzleSprites.length} muzzle sprites for pattern: $muzzleSpritePattern',
     // );
 
     if (muzzleSprites.isEmpty) {
-      debugPrint(
-        '⚠️ No muzzle flash sprites found for $displayName, using fallback',
-      );
+      debugPrint('⚠️ No muzzle flash sprites found for $displayName, using fallback');
       createSimpleMuzzleFlash(player, offset);
       return;
     }
@@ -174,13 +166,7 @@ abstract class WeaponBase {
     //   '🔫 Muzzle flash - pos: $muzzlePos, dir: $direction, offset: $offset, angle: ${player.faceAngleRadians * 180 / pi}°',
     // );
 
-    final muzzle = MuzzleFlash(
-      position: muzzlePos,
-      frames: muzzleSprites,
-      frameDuration: 0.05,
-      size: Vector2(48, 48),
-      angle: player.faceAngleRadians,
-    );
+    final muzzle = MuzzleFlash(position: muzzlePos, frames: muzzleSprites, frameDuration: 0.05, size: Vector2(256, 256), angle: player.faceAngleRadians);
 
     // Добавляем эффект в мир через addEffectToWorld
     addEffectToWorld(muzzle);
@@ -194,10 +180,7 @@ abstract class WeaponBase {
     final side = Vector2(direction.y, -direction.x) * offset.y;
     final muzzlePos = player.position + forward + side;
 
-    final flash = SimpleMuzzleFlash(
-      position: muzzlePos,
-      angle: player.faceAngleRadians,
-    );
+    final flash = SimpleMuzzleFlash(position: muzzlePos, angle: player.faceAngleRadians);
     addEffectToWorld(flash);
   }
 }

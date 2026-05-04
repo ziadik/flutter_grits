@@ -15,19 +15,10 @@ class MuzzleFlash extends PositionComponent {
   Sprite? _currentSprite;
   double _rotationAngle = 0;
 
-  MuzzleFlash({
-    required Vector2 position,
-    required List<TrimmedSprite> frames,
-    double frameDuration = 0.05,
-    Vector2? size,
-    double angle = 0,
-  }) : _frames = frames,
-       _frameDuration = frameDuration,
-       super(
-         position: position,
-         size: size ?? Vector2(256, 256),
-         anchor: Anchor.center,
-       ) {
+  MuzzleFlash({required Vector2 position, required List<TrimmedSprite> frames, double frameDuration = 0.05, Vector2? size, double angle = 0})
+    : _frames = frames,
+      _frameDuration = frameDuration,
+      super(position: position, size: size ?? Vector2(256, 256), anchor: Anchor.center) {
     // Сохраняем угол поворота
     _rotationAngle = angle;
   }
@@ -102,7 +93,7 @@ class SimpleMuzzleFlash extends PositionComponent {
 
   SimpleMuzzleFlash({required Vector2 position, double angle = 0}) {
     this.position = position;
-    size = Vector2(24, 24);
+    size = Vector2(256, 256);
     anchor = Anchor.center;
     _rotationAngle = angle;
   }

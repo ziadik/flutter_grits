@@ -55,16 +55,7 @@ class GrenadeLauncher extends WeaponBase {
     final spawnPos = getBulletSpawnOffset(player, 20);
 
     // Создать гранату
-    final grenade = Bullet(
-      gameWorld: player.gameWorld,
-      position: spawnPos,
-      owner: player,
-      direction: direction,
-      damage: damage,
-      speed: 250,
-      lifetime: 4.0,
-      spritePattern: projectileSpritePattern,
-    );
+    final grenade = Bullet(gameWorld: player.gameWorld, position: spawnPos, owner: player, direction: direction, damage: damage, speed: 250, lifetime: 4.0, spritePattern: projectileSpritePattern);
 
     // Добавить гранату в игровой мир
     addProjectileToWorld(grenade);
