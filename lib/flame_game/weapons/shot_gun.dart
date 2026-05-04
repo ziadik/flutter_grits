@@ -62,22 +62,13 @@ class ShotGun extends WeaponBase {
 
       final spawnPos = getBulletSpawnOffset(player, 20);
 
-      final bullet = Bullet(
-        gameWorld: player.gameWorld,
-        position: spawnPos,
-        owner: player,
-        direction: direction,
-        damage: damage,
-        speed: 700,
-        lifetime: 2.0,
-        spritePattern: projectileSpritePattern,
-      );
+      final bullet = Bullet(gameWorld: player.gameWorld, position: spawnPos, owner: player, direction: direction, damage: damage, speed: 700, lifetime: 2.0, spritePattern: projectileSpritePattern);
 
       addProjectileToWorld(bullet);
     }
 
     // Создаем muzzle flash для дробовика (позиция дула: x=38, y=-4)
-    createMuzzleFlash(player, Vector2(38, -4));
+    createMuzzleFlash(player, Vector2(50, -5));
 
     // Воспроизводим звук выстрела
     SoundManager().playShootSound(SoundAssets.shotgunShoot0);

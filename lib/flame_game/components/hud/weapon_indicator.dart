@@ -57,23 +57,14 @@ class WeaponIconComponent extends PositionComponent {
 
     final offset = _weaponIconPositions[_currentWeaponName];
     if (offset == null) {
-      debugPrint(
-        '❌ WeaponIconComponent: no icon position for $_currentWeaponName',
-      );
+      debugPrint('❌ WeaponIconComponent: no icon position for $_currentWeaponName');
       return;
     }
 
-    debugPrint(
-      '🖼️ Rendering icon: $_currentWeaponName at (${offset.dx}, ${offset.dy})',
-    );
+    debugPrint('🖼️ Rendering icon: $_currentWeaponName at (${offset.dx}, ${offset.dy})');
 
     // Рисуем часть спрайт-листа
-    final srcRect = Rect.fromLTWH(
-      offset.dx,
-      offset.dy,
-      _iconWidth,
-      _iconHeight,
-    );
+    final srcRect = Rect.fromLTWH(offset.dx, offset.dy, _iconWidth, _iconHeight);
 
     final destRect = Rect.fromLTWH(0, 0, size.x, size.y);
 
@@ -97,12 +88,7 @@ class WeaponIndicatorComponent extends PositionComponent {
   late RectangleComponent _background;
   late RectangleComponent _selectionBorder;
 
-  WeaponIndicatorComponent({
-    required this.player,
-    Vector2? position,
-    Vector2? size,
-  }) : _size = size ?? Vector2(430, 58),
-       super(position: position ?? Vector2(20, 20), anchor: Anchor.topLeft);
+  WeaponIndicatorComponent({required this.player, Vector2? position, Vector2? size}) : _size = size ?? Vector2(430, 58), super(position: position ?? Vector2(20, 20), anchor: Anchor.topLeft);
 
   @override
   Future<void> onLoad() async {
@@ -138,10 +124,7 @@ class WeaponIndicatorComponent extends PositionComponent {
       _slotBorders.add(border);
       await add(border);
 
-      final icon = WeaponIconComponent(
-        position: Vector2(x + (_slotWidth - _iconSize) / 2, 5),
-        size: Vector2(_iconSize, _iconSize),
-      );
+      final icon = WeaponIconComponent(position: Vector2(x + (_slotWidth - _iconSize) / 2, 5), size: Vector2(_iconSize, _iconSize));
       await icon.loadInterfaceImage();
       _slotIcons.add(icon);
       await add(icon);
@@ -149,11 +132,7 @@ class WeaponIndicatorComponent extends PositionComponent {
       final label = TextComponent(
         position: Vector2(x + 5, 3),
         textRenderer: TextPaint(
-          style: const TextStyle(
-            fontSize: 10,
-            color: Colors.white70,
-            fontWeight: FontWeight.bold,
-          ),
+          style: const TextStyle(fontSize: 10, color: Colors.white70, fontWeight: FontWeight.bold),
         ),
         text: '${i + 1}',
       );
@@ -187,25 +166,23 @@ class WeaponIndicatorComponent extends PositionComponent {
     final icon = _slotIcons[slotIndex];
 
     if (weapon != null) {
-      debugPrint('🔧 Slot $slotIndex: weapon="${weapon.displayName}"');
+      // debugPrint('🔧 Slot $slotIndex: weapon="${weapon.displayName}"');
       final weaponName = _getWeaponIconName(weapon.displayName);
-      debugPrint('🔧 Slot $slotIndex: iconName="$weaponName"');
+      // debugPrint('🔧 Slot $slotIndex: iconName="$weaponName"');
       if (weaponName != null) {
         icon.setWeaponIcon(weaponName);
-        debugPrint('✅ Weapon icon set for slot $slotIndex: $weaponName');
+        // debugPrint('✅ Weapon icon set for slot $slotIndex: $weaponName');
       } else {
         icon.clearIcon();
-        debugPrint('❌ No icon mapping for: ${weapon.displayName}');
+        // debugPrint('❌ No icon mapping for: ${weapon.displayName}');
       }
     } else {
       icon.clearIcon();
-      debugPrint('⚠️ Slot $slotIndex: no weapon');
+      // debugPrint('⚠️ Slot $slotIndex: no weapon');
     }
 
     final border = _slotBorders[slotIndex];
-    border.paint.color = isSelected
-        ? Colors.yellow.withValues(alpha: 0.8)
-        : Colors.white.withValues(alpha: 0.3);
+    border.paint.color = isSelected ? Colors.yellow.withValues(alpha: 0.8) : Colors.white.withValues(alpha: 0.3);
     border.paint.strokeWidth = isSelected ? 2 : 1;
   }
 
@@ -242,14 +219,8 @@ class WeaponIndicatorComponent extends PositionComponent {
     _updateDisplay();
   }
 
-  static Future<WeaponIndicatorComponent> create({
-    required Player player,
-    Vector2? position,
-  }) async {
-    final indicator = WeaponIndicatorComponent(
-      player: player,
-      position: position,
-    );
+  static Future<WeaponIndicatorComponent> create({required Player player, Vector2? position}) async {
+    final indicator = WeaponIndicatorComponent(player: player, position: position);
     await indicator.onLoad();
     return indicator;
   }

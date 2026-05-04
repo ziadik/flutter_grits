@@ -2,13 +2,7 @@
 import 'package:flame/camera.dart';
 import 'package:flame/components.dart';
 import 'package:flame/game.dart';
-import 'package:flame/events.dart'
-    show
-        KeyboardEvents,
-        PointerMoveCallbacks,
-        TapCallbacks,
-        TapDownEvent,
-        TapUpEvent;
+import 'package:flame/events.dart' show KeyboardEvents, PointerMoveCallbacks, TapCallbacks, TapDownEvent, TapUpEvent;
 
 import 'package:flame/src/events/messages/pointer_move_event.dart';
 import 'package:flutter/gestures.dart' hide PointerMoveEvent;
@@ -28,12 +22,7 @@ import 'package:flutter_grits/flame_game/widgets/settings_dialog.dart';
 import 'package:flutter_grits/main.dart' show navigatorKey;
 import 'package:flutter/material.dart' hide PointerMoveEvent;
 
-class GritsGame extends FlameGame
-    with
-        KeyboardEvents,
-        TapCallbacks,
-        PointerMoveCallbacks,
-        HasCollisionDetection {
+class GritsGame extends FlameGame with KeyboardEvents, TapCallbacks, PointerMoveCallbacks, HasCollisionDetection {
   final ResourceManager resourceManager;
   late InputManager inputManager;
   late GameWorld gameWorld;
@@ -46,6 +35,10 @@ class GritsGame extends FlameGame
   SettingsButtonComponent? _settingsButton;
 
   GritsGame({required this.resourceManager}) : super();
+
+  Future<void> connectToGame(String serverUrl, String playerName, String roomId) async {
+    await gameWorld.connectToServer(serverUrl, playerName, roomId);
+  }
 
   /// Метод для показа диалога настроек из Flame компонента
   void showSettingsDialog() {
@@ -79,10 +72,7 @@ class GritsGame extends FlameGame
     inputManager = InputManager();
 
     // Создаем игровой мир
-    gameWorld = GameWorld(
-      resourceManager: resourceManager,
-      inputManager: inputManager,
-    );
+    gameWorld = GameWorld(resourceManager: resourceManager, inputManager: inputManager);
 
     // Добавляем мир вручную (не через world)
     await add(gameWorld);
@@ -117,10 +107,7 @@ class GritsGame extends FlameGame
     }
 
     // Создаем камеру с фиксированным размером вьюпорта
-    camera = CameraComponent(
-      viewport: FixedSizeViewport(800, 800),
-      world: gameWorld,
-    );
+    camera = CameraComponent(viewport: FixedSizeViewport(800, 800), world: gameWorld);
 
     // Настраиваем мгновенное слежение за игроком (без плавности)
     camera.follow(
@@ -144,10 +131,7 @@ class GritsGame extends FlameGame
     final screenSize = camera.viewport.size;
 
     // FPS счетчик
-    final fpsCounter = FpsCounterComponent(
-      position: Vector2(screenSize.x - 50, 30),
-      anchor: Anchor.topRight,
-    );
+    final fpsCounter = FpsCounterComponent(position: Vector2(screenSize.x - 50, 30), anchor: Anchor.topRight);
     camera.viewport.add(fpsCounter);
 
     // Кнопка настроек (слева от FPS)
@@ -161,12 +145,7 @@ class GritsGame extends FlameGame
     camera.viewport.add(_settingsButton!);
 
     // Мини-карта
-    final minimap = MinimapComponent(
-      position: Vector2(20, screenSize.y - 40),
-      size: Vector2(180, 180),
-      world: gameWorld,
-      camera: camera,
-    );
+    final minimap = MinimapComponent(position: Vector2(20, screenSize.y - 40), size: Vector2(180, 180), world: gameWorld, camera: camera);
     camera.viewport.add(minimap);
 
     // Индикатор оружия
@@ -181,10 +160,7 @@ class GritsGame extends FlameGame
 
   void _addWeaponIndicator() {
     // Индикатор оружия
-    WeaponIndicatorComponent.create(
-      player: gameWorld.player,
-      position: Vector2(20, 20),
-    ).then((indicator) {
+    WeaponIndicatorComponent.create(player: gameWorld.player, position: Vector2(20, 20)).then((indicator) {
       camera.viewport.add(indicator);
       // debugPrint('✅ Weapon indicator added to HUD');
     });
@@ -213,10 +189,7 @@ class GritsGame extends FlameGame
   }
 
   @override
-  KeyEventResult onKeyEvent(
-    KeyEvent event,
-    Set<LogicalKeyboardKey> keysPressed,
-  ) {
+  KeyEventResult onKeyEvent(KeyEvent event, Set<LogicalKeyboardKey> keysPressed) {
     // Обработка F1 - переключение отладочного оверлея
     if (event is KeyDownEvent && keysPressed.contains(LogicalKeyboardKey.f1)) {
       _toggleDebugOverlay();
@@ -233,12 +206,7 @@ class GritsGame extends FlameGame
 
     if (_debugModeEnabled) {
       if (_collisionDebugOverlay == null) {
-        _collisionDebugOverlay = CollisionDebugOverlay(
-          gameWorld: gameWorld,
-          showPlayerBounds: true,
-          showCollisionTiles: true,
-          showInteractiveItems: true,
-        );
+        _collisionDebugOverlay = CollisionDebugOverlay(gameWorld: gameWorld, showPlayerBounds: true, showCollisionTiles: true, showInteractiveItems: true);
       }
 
       // Добавляем оверлей В МИР, а не на камеру
