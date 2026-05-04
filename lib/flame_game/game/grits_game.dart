@@ -8,6 +8,7 @@ import 'package:flame/src/events/messages/pointer_move_event.dart';
 import 'package:flutter/gestures.dart' hide PointerMoveEvent;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart' hide PointerMoveEvent;
+import 'package:flutter_grits/flame_game/components/hud/connection_status.dart';
 import 'package:flutter_grits/flame_game/managers/input_manager.dart';
 import 'package:flutter_grits/flame_game/managers/resource_manager.dart';
 import 'package:flutter_grits/flame_game/managers/sound_manager.dart';
@@ -147,7 +148,9 @@ class GritsGame extends FlameGame with KeyboardEvents, TapCallbacks, PointerMove
     // Мини-карта
     final minimap = MinimapComponent(position: Vector2(20, screenSize.y - 40), size: Vector2(180, 180), world: gameWorld, camera: camera);
     camera.viewport.add(minimap);
-
+    // Индикатор статуса подключения
+    final connectionStatus = ConnectionStatusComponent(gameClient: gameWorld.networkManager.client, position: Vector2(10, 10));
+    camera.viewport.add(connectionStatus);
     // Индикатор оружия
     Future.delayed(const Duration(milliseconds: 100), () {
       if (gameWorld.player.isLoaded) {

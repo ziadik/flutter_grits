@@ -1,5 +1,7 @@
 // lib/game/world/game_world.dart
 
+import 'dart:convert';
+
 import 'package:flame/collisions.dart';
 import 'package:flame/components.dart';
 import 'package:flame_tiled/flame_tiled.dart';
@@ -16,7 +18,9 @@ import 'package:flutter_grits/flame_game/entities/teleporter.dart';
 // import 'package:flutter_grits/flame_game/game/grits_game.dart';
 import 'package:flutter_grits/flame_game/weapons/weapon_registry.dart';
 import 'package:flutter_grits/flame_game/effects/player_spawn_effect.dart';
+import 'package:flutter_grits/main.dart';
 import 'package:flutter_grits/network/network_manager.dart';
+import 'package:http/http.dart' as http;
 
 /// Коллизионный блок с поддержкой флагов
 class CollisionBlock extends PositionComponent with CollisionCallbacks {
@@ -554,6 +558,35 @@ class GameWorld extends World {
     }
 
     updateSpawners(dt);
+  }
+
+  Future<bool> checkServerStatus(String serverUrl) async {
+    try {
+      final uri = Uri.parse(serverUrl);
+      final httpUrl = 'http://${uri.host}:${uri.port}';
+      final response = await http.get(Uri.parse('$httpUrl/ping'));
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('Server status check failed: $e');
+      return false;
+    }
+  }
+
+  Future<List<RoomInfo>> fetchRooms(String serverUrl) async {
+    try {
+      final uri = Uri.parse(serverUrl);
+      final httpUrl = 'http://${uri.host}:${uri.port}';
+      final response = await http.get(Uri.parse('$httpUrl/rooms'));
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.map((json) => RoomInfo.fromJson(json)).toList();
+      }
+      return [];
+    } catch (e) {
+      debugPrint('Failed to fetch rooms: $e');
+      return [];
+    }
   }
 
   Future<void> connectToServer(String serverUrl, String playerName, String roomId) async {
