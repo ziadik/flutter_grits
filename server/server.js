@@ -5,8 +5,38 @@ const WebSocket = require("ws");
 const http = require("http");
 const express = require("express");
 
+// ==================== ЛОГИРОВАНИЕ ====================
+const LOG_LEVELS = {
+  DEBUG: 0,
+  INFO: 1,
+  WARN: 2,
+  ERROR: 3,
+};
+
+const LOG_LEVEL = process.env.LOG_LEVEL ? LOG_LEVELS[process.env.LOG_LEVEL] : LOG_LEVELS.INFO;
+
+function log(level, message, data = null) {
+  const timestamp = new Date().toISOString();
+  const levelStr = `[${level}]`;
+  
+  if (LOG_LEVEL <= LOG_LEVELS[level]) {
+    if (data) {
+      console.log(`${timestamp} ${levelStr} ${message}`, data);
+    } else {
+      console.log(`${timestamp} ${levelStr} ${message}`);
+    }
+  }
+}
+
+const logger = {
+  debug: (msg, data) => log("DEBUG", msg, data),
+  info: (msg, data) => log("INFO", msg, data),
+  warn: (msg, data) => log("WARN", msg, data),
+  error: (msg, data) => log("ERROR", msg, data),
+};
+
 // ==================== КОНФИГУРАЦИЯ ====================
-const PORT = 8080;
+const PORT = process.env.PORT || 8080;
 const GAME_CONFIG = {
   maxPlayersPerRoom: 4,
   minPlayersToStart: 2,
@@ -16,6 +46,15 @@ const GAME_CONFIG = {
   quadDamageDuration: 10.0,
   tickRate: 50, // мс между тиками (20 FPS для сервера)
   enableDedup: true, // Дедупликация state сообщений
+};
+
+// Статистика сервера
+const serverStats = {
+  startTime: Date.now(),
+  totalConnections: 0,
+  totalDisconnections: 0,
+  totalMessages: 0,
+  errors: 0,
 };
 
 // ==================== ПРОТОКОЛ ====================
@@ -96,7 +135,7 @@ class Room {
     // Для дедупликации
     this._lastStateMessages = new Map(); // playerId -> lastMessageHash
 
-    console.log(`🏠 Комната ${roomId} создана`);
+    logger.info(`🏠 Комната ${roomId} создана`, { roomId });
   }
 
   _generateSpawnPoints() {
@@ -168,9 +207,12 @@ class Room {
     };
 
     this.players.set(playerId, player);
-    console.log(
-      `👤 Игрок ${playerName} (${playerId}) присоединился, команда ${team}`,
-    );
+    logger.info(`👤 Игрок ${playerName} (${playerId}) присоединился, команда ${team}`, {
+      playerId,
+      playerName,
+      team,
+      roomId: this.id,
+    });
 
     return player;
   }
@@ -178,12 +220,17 @@ class Room {
   removePlayer(playerId) {
     const player = this.players.get(playerId);
     if (player) {
-      console.log(`👋 Игрок ${player.name} покинул комнату ${this.id}`);
+      logger.info(`👋 Игрок ${player.name} покинул комнату ${this.id}`, {
+        playerId,
+        playerName: player.name,
+        roomId: this.id,
+        playersRemaining: this.players.size - 1,
+      });
       this.players.delete(playerId);
 
       if (this.players.size === 0) {
         rooms.delete(this.id);
-        console.log(`🏠 Комната ${this.id} удалена`);
+        logger.info(`🏠 Комната ${this.id} удалена`, { roomId: this.id });
         return true;
       }
     }
@@ -204,7 +251,11 @@ class Room {
     player.isDead = false;
     player.respawnTimer = 0;
 
-    console.log(`🔄 Игрок ${player.name} воскрес`);
+    logger.info(`🔄 Игрок ${player.name} воскрес`, {
+      playerId,
+      playerName: player.name,
+      position: player.position,
+    });
   }
 
   update(deltaTime) {
@@ -260,7 +311,10 @@ class Room {
 
   startGame() {
     this.state = "playing";
-    console.log(`🎮 Игра в комнате ${this.id} началась!`);
+    logger.info(`🎮 Игра в комнате ${this.id} началась!`, {
+      roomId: this.id,
+      playerCount: this.players.size,
+    });
     this.broadcast({ type: "game_start" });
   }
 
@@ -323,7 +377,14 @@ class Room {
       shooter.kills++;
       target.deaths++;
 
-      console.log(`💀 ${shooter.name} убил ${target.name}!`);
+      logger.info(`💀 ${shooter.name} убил ${target.name}!`, {
+        shooterId: shooter.id,
+        shooterName: shooter.name,
+        targetId: target.id,
+        targetName: target.name,
+        damage: finalDamage,
+        roomId: this.id,
+      });
 
       this.broadcast({
         type: "player_died",
@@ -348,15 +409,31 @@ class Room {
 
     switch (item.type) {
       case "HealthCanister":
+        const oldHealth = player.health;
         player.health = Math.min(player.maxHealth, player.health + 25);
+        logger.debug(`❤️ Игрок ${player.name} подобрал HealthCanister`, {
+          playerId: player.id,
+          oldHealth,
+          newHealth: player.health,
+        });
         break;
       case "EnergyCanister":
+        const oldEnergy = player.energy;
         player.energy = Math.min(player.maxEnergy, player.energy + 25);
+        logger.debug(`⚡ Игрок ${player.name} подобрал EnergyCanister`, {
+          playerId: player.id,
+          oldEnergy,
+          newEnergy: player.energy,
+        });
         break;
       case "QuadDamage":
         player.damageMultiplier = 4.0;
         player.quadDamageEndTime =
           Date.now() / 1000 + GAME_CONFIG.quadDamageDuration;
+        logger.info(`🔥 Игрок ${player.name} получил Quad Damage!`, {
+          playerId: player.id,
+          duration: GAME_CONFIG.quadDamageDuration,
+        });
         break;
     }
 
@@ -420,23 +497,31 @@ app.use(express.static("public"));
 const clients = new Map(); // ws -> { room, playerId }
 
 wss.on("connection", (ws) => {
-  console.log("🔌 Новое WebSocket соединение");
+  serverStats.totalConnections++;
+  const clientId = `client_${serverStats.totalConnections}`;
+  logger.info(`🔌 Новое WebSocket соединение`, { clientId, ip: ws._socket.remoteAddress });
 
   let currentRoom = null;
   let currentPlayerId = null;
   let lastInputTime = Date.now();
+  let messageCount = 0;
 
   ws.on("message", (data) => {
+    serverStats.totalMessages++;
+    messageCount++;
     try {
       const message = JSON.parse(data.toString());
+      logger.debug(`📩 Сообщение от ${clientId}`, { clientId, type: message.type, count: messageCount });
       handleMessage(ws, message);
     } catch (e) {
-      console.error("Ошибка парсинга сообщения:", e);
+      serverStats.errors++;
+      logger.error(`❌ Ошибка парсинга сообщения от ${clientId}`, { clientId, error: e.message });
     }
   });
 
   ws.on("close", () => {
-    console.log("🔌 WebSocket соединение закрыто");
+    serverStats.totalDisconnections++;
+    logger.info(`🔌 WebSocket соединение закрыто`, { clientId, messagesReceived: messageCount });
     if (currentRoom && currentPlayerId) {
       const room = rooms.get(currentRoom);
       if (room) {
@@ -455,6 +540,7 @@ wss.on("connection", (ws) => {
               reason: "Недостаточно игроков",
             });
             room.state = "ended";
+            logger.info(`🏁 Игра завершена в комнате ${currentRoom}`, { reason: "Недостаточно игроков" });
           }
         }
       }
@@ -492,10 +578,12 @@ wss.on("connection", (ws) => {
 
   function handleJoin(ws, msg) {
     const { playerName, roomId } = msg;
+    logger.info(`🎯 Попытка подключения игрока`, { playerName, roomId });
 
     let room = rooms.get(roomId);
     if (!room) {
       if (rooms.size > 50) {
+        logger.warn(`❌ Сервер перегружен`, { roomId, currentRooms: rooms.size });
         ws.send(
           JSON.stringify({ type: "error", message: "Сервер перегружен" }),
         );
@@ -506,6 +594,7 @@ wss.on("connection", (ws) => {
     }
 
     if (room.players.size >= GAME_CONFIG.maxPlayersPerRoom) {
+      logger.warn(`❌ Комната полна`, { roomId, playerCount: room.players.size });
       ws.send(JSON.stringify({ type: "error", message: "Комната полна" }));
       return;
     }
@@ -513,6 +602,12 @@ wss.on("connection", (ws) => {
     const player = room.addPlayer(ws, playerName);
     currentRoom = room.id;
     currentPlayerId = player.id;
+    logger.info(`✅ Игрок подключился к комнате`, {
+      playerId: player.id,
+      playerName,
+      roomId,
+      team: player.team,
+    });
 
     // Отправляем подтверждение с начальным состоянием
     ws.send(
@@ -583,18 +678,37 @@ wss.on("connection", (ws) => {
   }
 
   function handleShoot(msg) {
-    if (!currentRoom || !currentPlayerId) return;
+    if (!currentRoom || !currentPlayerId) {
+      logger.warn(`⚠️ Попытка выстрела без подключения`, { currentRoom, currentPlayerId });
+      return;
+    }
 
     const room = rooms.get(currentRoom);
     if (!room) return;
 
     const player = room.players.get(currentPlayerId);
-    if (!player || player.isDead) return;
+    if (!player || player.isDead) {
+      logger.warn(`⚠️ Недействительный игрок для выстрела`, { playerId: currentPlayerId, isDead: player?.isDead });
+      return;
+    }
 
     const weaponCost = { 0: 2, 1: 4, 2: 10 }[player.weaponSlot] || 2;
-    if (player.energy < weaponCost) return;
+    if (player.energy < weaponCost) {
+      logger.debug(`⚡ Недостаточно энергии для выстрела`, {
+        playerId: currentPlayerId,
+        energy: player.energy,
+        required: weaponCost,
+      });
+      return;
+    }
 
     player.energy -= weaponCost;
+    logger.debug(`🔫 Выстрел игрока`, {
+      playerId: currentPlayerId,
+      weaponSlot: player.weaponSlot,
+      energyCost: weaponCost,
+      remainingEnergy: player.energy,
+    });
 
     room.broadcast(
       {
@@ -742,23 +856,27 @@ app.get("/rooms", (req, res) => {
       state: room.state,
     });
   }
+  logger.debug(`📊 Запрос списка комнат`, { roomCount: roomsList.length });
   res.json(roomsList);
 });
 
 app.get("/stats", (req, res) => {
-  res.json({
+  const stats = {
     rooms: rooms.size,
     totalPlayers: Array.from(rooms.values()).reduce(
       (sum, r) => sum + r.players.size,
       0,
     ),
     uptime: process.uptime(),
-  });
+    serverStats,
+  };
+  logger.debug(`📈 Запрос статистики`, stats);
+  res.json(stats);
 });
 
 // Эндпоинт для мониторинга (как в старом сервере)
 app.get("/ping", (req, res) => {
-  res.json({
+  const pingData = {
     status: "ok",
     games: rooms.size,
     players: Array.from(rooms.values()).reduce(
@@ -767,26 +885,29 @@ app.get("/ping", (req, res) => {
     ),
     uptime: process.uptime(),
     memory: process.memoryUsage(),
-  });
+    serverStats,
+  };
+  logger.debug(`🏓 Ping запрос`, pingData);
+  res.json(pingData);
 });
 
 app.post("/create-room", express.json(), (req, res) => {
   const { roomId, maxPlayers } = req.body;
+  logger.info(`🎯 Запрос создания комнаты`, { roomId, maxPlayers });
 
   if (rooms.has(roomId)) {
+    logger.warn(`❌ Комната уже существует`, { roomId });
     res.status(400).json({ error: "Room already exists" });
     return;
   }
 
-  // Опционально: создаём комнату сразу
-  // Комната создастся при первом подключении игрока
-
+  logger.info(`✅ Комната готова к созданию`, { roomId });
   res.json({ success: true, roomId: roomId });
 });
 
 // ==================== ЗАПУСК ====================
 server.listen(PORT, () => {
-  console.log(`
+  const startupInfo = `
 ╔══════════════════════════════════════════════════════════════╗
 ║                                                              ║
 ║     🎮 GRITS GAME SERVER STARTED (Enhanced) 🎮              ║
@@ -795,11 +916,39 @@ server.listen(PORT, () => {
 ║     Макс. игроков на комнату: ${GAME_CONFIG.maxPlayersPerRoom}            ║
 ║     Tick rate: ${GAME_CONFIG.tickRate}ms                             ║
 ║     Дедупликация: ${GAME_CONFIG.enableDedup ? "ВКЛ" : "ВЫКЛ"}                    ║
+║     Уровень логов: ${Object.keys(LOG_LEVELS).find(key => LOG_LEVELS[key] === LOG_LEVEL)}              ║
 ║                                                              ║
 ║     WebSocket: ws://localhost:${PORT}                        ║
+║     HTTP API:  http://localhost:${PORT}                      ║
 ║                                                              ║
 ╚══════════════════════════════════════════════════════════════╝
-    `);
+    `;
+  
+  console.log(startupInfo);
+  logger.info(`🚀 Сервер запущен на порту ${PORT}`, { port: PORT });
 
   gameLoop();
 });
+
+// Обработка ошибок сервера
+server.on('error', (err) => {
+  serverStats.errors++;
+  logger.error(`❌ Ошибка сервера`, { error: err.message, code: err.code });
+  if (err.code === 'EADDRINUSE') {
+    console.error(`Порт ${PORT} занят. Используйте другой порт или освободите текущий.`);
+  }
+});
+
+// Периодический лог статистики (каждые 5 минут)
+if (LOG_LEVEL <= LOG_LEVELS.INFO) {
+  setInterval(() => {
+    logger.info(`📊 Статистика сервера`, {
+      totalConnections: serverStats.totalConnections,
+      totalDisconnections: serverStats.totalDisconnections,
+      totalMessages: serverStats.totalMessages,
+      errors: serverStats.errors,
+      activeRooms: rooms.size,
+      activePlayers: Array.from(rooms.values()).reduce((sum, r) => sum + r.players.size, 0),
+    });
+  }, 300000); // 5 минут
+}

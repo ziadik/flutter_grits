@@ -1,11 +1,10 @@
 import 'package:flame/components.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' hide ConnectionState;
 import 'package:flutter_grits/flame_game/game/world/game_world.dart';
 import 'package:flutter_grits/flame_game/entities/player.dart';
 import 'package:flutter_grits/flame_game/managers/resource_manager.dart';
-import 'package:flutter_grits/network/game_client.dart';
-import 'package:vector_math/vector_math.dart' hide Colors;
+import 'package:flutter_grits/network/game_client.dart'
+    show GameClient, ConnectionState, NetworkPlayer;
 
 /// Менеджер сети для синхронизации игрового мира
 class NetworkManager {
@@ -66,7 +65,13 @@ class NetworkManager {
 
     if (remote == null) {
       // Создаём нового удалённого игрока
-      remote = RemotePlayerComponent(playerId: netPlayer.id, playerName: netPlayer.name, team: netPlayer.team, resourceManager: gameWorld.resourceManager, gameWorld: gameWorld);
+      remote = RemotePlayerComponent(
+        playerId: netPlayer.id,
+        playerName: netPlayer.name,
+        team: netPlayer.team,
+        resourceManager: gameWorld.resourceManager,
+        gameWorld: gameWorld,
+      );
       _remotePlayers[netPlayer.id] = remote;
       gameWorld.add(remote);
     }
@@ -74,7 +79,13 @@ class NetworkManager {
     remote.updateFromNetwork(netPlayer);
   }
 
-  void _showRemoteShoot(String playerId, double x, double y, double angle, int weaponSlot) {
+  void _showRemoteShoot(
+    String playerId,
+    double x,
+    double y,
+    double angle,
+    int weaponSlot,
+  ) {
     final remote = _remotePlayers[playerId];
     remote?.shoot(Vector2(x, y), angle, weaponSlot);
   }
@@ -85,7 +96,11 @@ class NetworkManager {
   }
 
   /// Подключение к серверу
-  Future<void> connect(String serverUrl, String playerName, String roomId) async {
+  Future<void> connect(
+    String serverUrl,
+    String playerName,
+    String roomId,
+  ) async {
     _client.connect(serverUrl, playerName, roomId);
 
     // Ждём получения ID игрока
@@ -144,18 +159,20 @@ class RemotePlayerComponent extends PositionComponent {
 
   // Состояние
   Vector2 _targetPosition = Vector2.zero();
-  Vector2 _velocity = Vector2.zero();
   double _targetAngle = 0;
-  bool _isWalking = false;
   double _health = 100;
-  double _energy = 100;
-  int _weaponSlot = 0;
   bool _isDead = false;
 
   // Компоненты для отрисовки
   late SpriteComponent _turretComponent;
 
-  RemotePlayerComponent({required this.playerId, required this.playerName, required this.team, required this.resourceManager, required this.gameWorld}) {
+  RemotePlayerComponent({
+    required this.playerId,
+    required this.playerName,
+    required this.team,
+    required this.resourceManager,
+    required this.gameWorld,
+  }) {
     size = Vector2(128, 128);
     anchor = Anchor.center;
   }
@@ -180,12 +197,8 @@ class RemotePlayerComponent extends PositionComponent {
 
   void updateFromNetwork(NetworkPlayer netPlayer) {
     _targetPosition = Vector2(netPlayer.x, netPlayer.y);
-    _velocity = Vector2(netPlayer.vx, netPlayer.vy);
     _targetAngle = netPlayer.angle;
-    _isWalking = netPlayer.walking;
     _health = netPlayer.health;
-    _energy = netPlayer.energy;
-    _weaponSlot = netPlayer.weaponSlot;
     _isDead = netPlayer.isDead;
 
     _turretComponent.angle = _targetAngle;
@@ -222,11 +235,18 @@ class RemotePlayerComponent extends PositionComponent {
     // Базовая отрисовка круга для удалённых игроков
     final color = team == 0 ? Colors.blue : Colors.orange;
 
-    canvas.drawCircle(Offset.zero, 32, Paint()..color = color.withOpacity(0.5));
+    canvas.drawCircle(
+      Offset.zero,
+      32,
+      Paint()..color = color.withValues(alpha: 0.5),
+    );
 
     // Индикатор здоровья
     final healthPercent = _health / 100;
-    canvas.drawRect(Rect.fromLTWH(-32, -40, 64 * healthPercent, 6), Paint()..color = Colors.red);
+    canvas.drawRect(
+      Rect.fromLTWH(-32, -40, 64 * healthPercent, 6),
+      Paint()..color = Colors.red,
+    );
 
     // Имя игрока
     final textPainter = TextPainter(

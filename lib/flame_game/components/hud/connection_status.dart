@@ -1,9 +1,9 @@
-// Создайте компонент ConnectionStatusComponent:
+// Компонент отображения статуса подключения
 
 import 'package:flame/components.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter_grits/network/game_client.dart';
-import 'package:flutter_grits/network/network_manager.dart';
+import 'package:flutter/material.dart' hide ConnectionState;
+import 'package:flutter_grits/network/game_client.dart'
+    show ConnectionState, GameClient;
 
 class ConnectionStatusComponent extends PositionComponent {
   final GameClient gameClient;
@@ -13,7 +13,8 @@ class ConnectionStatusComponent extends PositionComponent {
   double _pingValue = 0;
   double _pingTime = 0;
 
-  ConnectionStatusComponent({required this.gameClient, Vector2? position}) : super(position: position ?? Vector2(10, 10)) {
+  ConnectionStatusComponent({required this.gameClient, Vector2? position})
+    : super(position: position ?? Vector2(10, 10)) {
     anchor = Anchor.topLeft;
   }
 
@@ -95,7 +96,9 @@ class ConnectionStatusComponent extends PositionComponent {
     _pingTime += dt;
     if (_pingTime >= 1.0) {
       _pingTime = 0;
-      _pingValue = _pingValue * 0.7 + (20 + DateTime.now().millisecondsSinceEpoch % 50) * 0.3;
+      _pingValue =
+          _pingValue * 0.7 +
+          (20 + DateTime.now().millisecondsSinceEpoch % 50) * 0.3;
       _pingText.text = 'Ping: ${_pingValue.toInt()} ms';
     }
   }

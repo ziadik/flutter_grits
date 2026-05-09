@@ -7,10 +7,15 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/status.dart' as status;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_grits/flame_game/entities/player.dart';
-import 'package:flutter_grits/flame_game/game/world/game_world.dart';
 
 /// Состояние сетевого подключения
-enum ConnectionState { disconnected, connecting, connected, reconnecting, failed }
+enum ConnectionState {
+  disconnected,
+  connecting,
+  connected,
+  reconnecting,
+  failed,
+}
 
 /// Информация о другом игроке в сети
 class NetworkPlayer {
@@ -64,7 +69,8 @@ class GameClient {
 
   // Колбэки для обновления игрового мира
   Function(List<NetworkPlayer> players)? onPlayersUpdate;
-  Function(String playerId, double x, double y, double angle, int weaponSlot)? onPlayerShoot;
+  Function(String playerId, double x, double y, double angle, int weaponSlot)?
+  onPlayerShoot;
   Function(String playerId, double damage, bool killed)? onHitResult;
   Function(String playerId, String killerId)? onPlayerDied;
   Function(String playerId, double x, double y)? onPlayerRespawned;
@@ -82,11 +88,13 @@ class GameClient {
   ConnectionState get connectionState => _connectionState;
   String? get playerId => _playerId;
   String? get roomId => _currentRoomId;
-  Map<String, NetworkPlayer> get remotePlayers => Map.unmodifiable(_remotePlayers);
+  Map<String, NetworkPlayer> get remotePlayers =>
+      Map.unmodifiable(_remotePlayers);
 
   /// Подключение к серверу
   void connect(String serverUrl, String playerName, String roomId) {
-    if (_connectionState == ConnectionState.connecting || _connectionState == ConnectionState.connected) {
+    if (_connectionState == ConnectionState.connecting ||
+        _connectionState == ConnectionState.connected) {
       disconnect();
     }
 
@@ -136,7 +144,12 @@ class GameClient {
   }
 
   /// Отправка состояния ввода игрока
-  void sendInput(Vector2 position, Vector2 velocity, double angle, bool walking) {
+  void sendInput(
+    Vector2 position,
+    Vector2 velocity,
+    double angle,
+    bool walking,
+  ) {
     if (_connectionState != ConnectionState.connected) return;
 
     _send({
@@ -183,7 +196,9 @@ class GameClient {
 
   /// Отправка запроса на респавн
   void sendRespawn() {
-    if (_connectionState != ConnectionState.connected || _playerId == null) return;
+    if (_connectionState != ConnectionState.connected || _playerId == null) {
+      return;
+    }
 
     _send({'type': 'respawn', 'from': _playerId});
   }
@@ -367,8 +382,9 @@ class GameClient {
 
   void _handleShoot(Map<String, dynamic> data) {
     final shooterId = data['playerId'] as String;
-    final x = (data['x'] as num).toDouble();
-    final y = (data['y'] as num).toDouble();
+    final position = data['position'] as Map<String, dynamic>;
+    final x = (position['x'] as num).toDouble();
+    final y = (position['y'] as num).toDouble();
     final angle = (data['angle'] as num).toDouble();
     final weaponSlot = data['weaponSlot'] as int;
 
@@ -447,7 +463,8 @@ class GameClient {
   void _startReconnect() {
     _stopReconnect();
     _reconnectTimer = Timer(const Duration(seconds: 3), () {
-      if (_connectionState == ConnectionState.reconnecting && _currentRoomId != null) {
+      if (_connectionState == ConnectionState.reconnecting &&
+          _currentRoomId != null) {
         debugPrint('🔄 Attempting to reconnect...');
         // Переподключение нужно инициировать извне с сохранёнными данными
         onError?.call('Connection lost. Please reconnect.');
@@ -464,7 +481,10 @@ class GameClient {
     _stopPing();
     _pingTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
       if (_connectionState == ConnectionState.connected) {
-        _send({'type': 'ping', 'timestamp': DateTime.now().millisecondsSinceEpoch});
+        _send({
+          'type': 'ping',
+          'timestamp': DateTime.now().millisecondsSinceEpoch,
+        });
       }
     });
   }
