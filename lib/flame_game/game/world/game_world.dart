@@ -26,7 +26,13 @@ import 'package:http/http.dart' as http;
 class CollisionBlock extends PositionComponent with CollisionCallbacks {
   final List<String> collisionFlags;
 
-  CollisionBlock({required super.position, required super.size, this.collisionFlags = const []}) : super(anchor: Anchor.topLeft); // ✅ Важно: anchor.topLeft для правильного совпадения хитбокса
+  CollisionBlock({
+    required super.position,
+    required super.size,
+    this.collisionFlags = const [],
+  }) : super(
+         anchor: Anchor.topLeft,
+       ); // ✅ Важно: anchor.topLeft для правильного совпадения хитбокса
 
   bool hasFlag(String flag) => collisionFlags.contains(flag);
 
@@ -34,7 +40,13 @@ class CollisionBlock extends PositionComponent with CollisionCallbacks {
   Future<void> onLoad() async {
     await super.onLoad();
     // Хитбокс должен совпадать с размером и позицией блока
-    add(RectangleHitbox(position: Vector2.zero(), anchor: Anchor.topLeft, size: size));
+    add(
+      RectangleHitbox(
+        position: Vector2.zero(),
+        anchor: Anchor.topLeft,
+        size: size,
+      ),
+    );
   }
 
   @override
@@ -51,10 +63,10 @@ class GameWorld extends World {
   final ResourceManager resourceManager;
   final InputManager inputManager;
 
-  late Player player;
+  Player? player;
   late TiledComponent tiledMap;
   late SpawnSystem spawnSystem;
-  late NetworkManager networkManager;
+  NetworkManager? networkManager;
   int mapWidth = 6400;
   int mapHeight = 6400;
 
@@ -76,35 +88,28 @@ class GameWorld extends World {
 
   @override
   Future<void> onLoad() async {
+    debugPrint('🌍 GameWorld.onLoad() started');
     await _loadMap();
     await _createCollisionBlocks(); // Создаем Hitbox'ы из слоя коллизий
 
-    // // ТЕСТОВАЯ СТЕНА - красный квадрат для проверки коллизий
-    // final testWall = RectangleComponent(
-    //   position: Vector2(1000, 1000),
-    //   size: Vector2(100, 100),
-    //   paint: Paint()..color = Colors.red,
-    // );
-    // testWall.add(RectangleHitbox());
-    // add(testWall);
+    // Инициализация сетевого менеджера (ДО создания игрока)
+    debugPrint('🌐 Creating NetworkManager...');
+    networkManager = NetworkManager(gameWorld: this);
+    debugPrint('✅ NetworkManager created');
 
     await _createPlayer();
-
-    // Инициализация сетевого менеджера
-    networkManager = NetworkManager(gameWorld: this);
 
     // Установка оружия для игрока
     _setupPlayerWeapons();
 
     // Ждем пока игрок полностью загрузится, затем обновим оружие
     await Future.delayed(const Duration(milliseconds: 100));
-    player.updateWeaponSprite();
+    player?.updateWeaponSprite();
 
     _initSpawnSystem();
     _loadEnvironmentObjects();
     _loadGameObjects(); // Загружаем игровые объекты из слоя game_objects
     _loadGameEntities(); // Загружаем игровые сущности (спавны, телепорты)
-    // _displaySpawnersAsGameObjects(); // УДАЛЕНО - больше не нужно
   }
 
   Future<void> _loadMap() async {
@@ -130,12 +135,17 @@ class GameWorld extends World {
       // Упрощенный подход: создаем блоки для всех тайлов
       for (var x = 0; x < tileLayer.width; x++) {
         for (var y = 0; y < tileLayer.height; y++) {
-          final collisionBlock = CollisionBlock(position: Vector2(x * tileSize, y * tileSize), size: Vector2(tileSize, tileSize));
+          final collisionBlock = CollisionBlock(
+            position: Vector2(x * tileSize, y * tileSize),
+            size: Vector2(tileSize, tileSize),
+          );
           add(collisionBlock);
           collisionBlocks.add(collisionBlock);
         }
       }
-      debugPrint('✅ Создано ${collisionBlocks.length} коллизионных блоков из TileLayer');
+      debugPrint(
+        '✅ Создано ${collisionBlocks.length} коллизионных блоков из TileLayer',
+      );
 
       // Устанавливаем низкий приоритет для стен
       for (final block in collisionBlocks) {
@@ -156,29 +166,44 @@ class GameWorld extends World {
           }
         }
 
-        final collisionBlock = CollisionBlock(position: Vector2(obj.x, obj.y), size: Vector2(obj.width, obj.height), collisionFlags: flags);
+        final collisionBlock = CollisionBlock(
+          position: Vector2(obj.x, obj.y),
+          size: Vector2(obj.width, obj.height),
+          collisionFlags: flags,
+        );
         add(collisionBlock);
         collisionBlocks.add(collisionBlock);
       }
-      debugPrint('✅ Создано ${collisionBlocks.length} коллизионных блоков из ObjectGroup');
+      debugPrint(
+        '✅ Создано ${collisionBlocks.length} коллизионных блоков из ObjectGroup',
+      );
     }
   }
 
   Future<void> _createPlayer() async {
     // Получаем стартовую позицию из карты или используем центр
-    final startPosition = _getStartPositionFromMap() ?? Vector2(mapWidth / 2, mapHeight / 2);
+    final startPosition =
+        _getStartPositionFromMap() ?? Vector2(mapWidth / 2, mapHeight / 2);
 
-    player = Player(position: startPosition, resourceManager: resourceManager, gameWorld: this);
+    player = Player(
+      position: startPosition,
+      resourceManager: resourceManager,
+      gameWorld: this,
+    );
 
     // Подписываем игрока на ввод
-    player.inputManager = inputManager;
+    player!.inputManager = inputManager;
 
-    await add(player);
+    await add(player!);
     debugPrint('✅ Player created at $startPosition');
 
     // ✅ Показываем эффект появления игрока (спавн)
     // Эффект будет показан под игроком и удалится через 0.5 сек
-    PlayerSpawnEffect.spawn(position: startPosition, animator: resourceManager.playerAnimator, gameWorld: this);
+    PlayerSpawnEffect.spawn(
+      position: startPosition,
+      animator: resourceManager.playerAnimator,
+      gameWorld: this,
+    );
   }
 
   Vector2? _getStartPositionFromMap() {
@@ -197,28 +222,32 @@ class GameWorld extends World {
 
   /// Установка оружия для игрока
   void _setupPlayerWeapons() {
+    if (player == null) return;
+
     // Регистрация всех оружий
     WeaponRegistry.register();
 
     // Слот 1: Основное оружие (MachineGun)
-    player.setWeapon(0, WeaponRegistry.createWeapon('MachineGun'));
+    player!.setWeapon(0, WeaponRegistry.createWeapon('MachineGun'));
 
     // Слот 2: Вторичное оружие (ShotGun)
-    player.setWeapon(1, WeaponRegistry.createWeapon('ShotGun'));
+    player!.setWeapon(1, WeaponRegistry.createWeapon('ShotGun'));
 
     // Слот 3: Chain Gun
-    player.setWeapon(2, WeaponRegistry.createWeapon('ChainGun'));
+    player!.setWeapon(2, WeaponRegistry.createWeapon('ChainGun'));
 
     // Слот 4: Ракетница (RocketLauncher)
-    player.setWeapon(3, WeaponRegistry.createWeapon('RocketLauncher'));
+    player!.setWeapon(3, WeaponRegistry.createWeapon('RocketLauncher'));
 
     // Слот 5: Гранатомёт (GrenadeLauncher)
-    player.setWeapon(4, WeaponRegistry.createWeapon('GrenadeLauncher'));
+    player!.setWeapon(4, WeaponRegistry.createWeapon('GrenadeLauncher'));
 
     // Слот 6: Рейлган (Railgun)
-    player.setWeapon(5, WeaponRegistry.createWeapon('Railgun'));
+    player!.setWeapon(5, WeaponRegistry.createWeapon('Railgun'));
 
-    debugPrint('✅ Weapons set: MachineGun, ShotGun, ChainGun, RocketLauncher, GrenadeLauncher, Railgun');
+    debugPrint(
+      '✅ Weapons set: MachineGun, ShotGun, ChainGun, RocketLauncher, GrenadeLauncher, Railgun',
+    );
   }
 
   void _loadEnvironmentObjects() {
@@ -277,7 +306,9 @@ class GameWorld extends World {
       return;
     }
 
-    debugPrint('✅ Загрузка игровых объектов из слоя game_objects (тип: ${layer.runtimeType})...');
+    debugPrint(
+      '✅ Загрузка игровых объектов из слоя game_objects (тип: ${layer.runtimeType})...',
+    );
 
     if (layer is TileLayer) {
       // Если это TileLayer - ищем специальные тайлы-предметы
@@ -286,7 +317,9 @@ class GameWorld extends World {
       // Если это ObjectGroup - читаем объекты
       _loadGameObjectsFromObjectGroup(layer);
     } else {
-      debugPrint('⚠️ Слой game_objects имеет неподдерживаемый тип: ${layer.runtimeType}');
+      debugPrint(
+        '⚠️ Слой game_objects имеет неподдерживаемый тип: ${layer.runtimeType}',
+      );
     }
   }
 
@@ -307,7 +340,9 @@ class GameWorld extends World {
       final objName = obj.name ?? '';
       final objType = obj.type ?? '';
 
-      debugPrint('   Объект: $objName, тип: $objType, позиция: (${obj.x}, ${obj.y})');
+      debugPrint(
+        '   Объект: $objName, тип: $objType, позиция: (${obj.x}, ${obj.y})',
+      );
 
       GameObjectType? type;
 
@@ -352,7 +387,9 @@ class GameWorld extends World {
   // }
 
   Future<void> _loadGameEntities() async {
-    final environmentLayer = tiledMap.tileMap.getLayer<ObjectGroup>('environment');
+    final environmentLayer = tiledMap.tileMap.getLayer<ObjectGroup>(
+      'environment',
+    );
     if (environmentLayer == null) {
       debugPrint('⚠️ Слой environment не найден');
       return;
@@ -432,7 +469,9 @@ class GameWorld extends World {
 
     add(gameObject);
     gameEntities.add(gameObject);
-    debugPrint('📦 Загружен спавнер предмета: ${obj.name} -> $type at ${gameObject.position}');
+    debugPrint(
+      '📦 Загружен спавнер предмета: ${obj.name} -> $type at ${gameObject.position}',
+    );
   }
 
   Future<void> _loadTeleporter(dynamic obj) async {
@@ -457,9 +496,17 @@ class GameWorld extends World {
       destination = Vector2(destX, destY);
     }
 
-    final teleporterPos = Vector2(obj.x + obj.width * 2, obj.y + obj.height * 2);
+    final teleporterPos = Vector2(
+      obj.x + obj.width * 2,
+      obj.y + obj.height * 2,
+    );
 
-    final teleporter = Teleporter(position: teleporterPos, destination: destination, animator: resourceManager.playerAnimator, gameWorld: this);
+    final teleporter = Teleporter(
+      position: teleporterPos,
+      destination: destination,
+      animator: resourceManager.playerAnimator,
+      gameWorld: this,
+    );
 
     await teleporter.onLoad();
     add(teleporter);
@@ -522,7 +569,12 @@ class GameWorld extends World {
     if (collisionBlocks.isNotEmpty) {
       for (final block in collisionBlocks) {
         canvas.drawRect(
-          Rect.fromLTWH(block.position.x, block.position.y, block.size.x, block.size.y),
+          Rect.fromLTWH(
+            block.position.x,
+            block.position.y,
+            block.size.x,
+            block.size.y,
+          ),
           Paint()
             ..color = Colors.red.withOpacity(0.3)
             ..style = PaintingStyle.fill,
@@ -535,26 +587,32 @@ class GameWorld extends World {
   void update(double dt) {
     super.update(dt);
 
+    if (player == null || networkManager == null) return;
+
     final moveDirection = inputManager.moveDirection;
-    player.move(moveDirection, dt);
+    player!.move(moveDirection, dt);
 
     // Отправка ввода на сервер
-    networkManager.sendLocalPlayerInput(player);
+    networkManager!.sendLocalPlayerInput(player!);
 
     // Обработка выстрела
     if (inputManager.isLeftMousePressed) {
-      final currentWeapon = player.selectedWeapon;
+      final currentWeapon = player!.selectedWeapon;
       if (currentWeapon != null) {
-        currentWeapon.tryFire(player);
-        networkManager.sendShoot(player.position, player.faceAngleRadians, player.selectedWeaponSlot);
+        currentWeapon.tryFire(player!);
+        networkManager!.sendShoot(
+          player!.position,
+          player!.faceAngleRadians,
+          player!.selectedWeaponSlot,
+        );
       }
     }
 
     // Смена оружия
     final slot = inputManager.getWeaponSlotKeyPress();
-    if (slot != null && slot != player.selectedWeaponSlot) {
-      player.selectWeapon(slot);
-      networkManager.sendWeaponSwitch(slot);
+    if (slot != null && slot != player!.selectedWeaponSlot) {
+      player!.selectWeapon(slot);
+      networkManager!.sendWeaponSwitch(slot);
     }
 
     updateSpawners(dt);
@@ -589,7 +647,14 @@ class GameWorld extends World {
     }
   }
 
-  Future<void> connectToServer(String serverUrl, String playerName, String roomId) async {
-    await networkManager.connect(serverUrl, playerName, roomId);
+  Future<void> connectToServer(
+    String serverUrl,
+    String playerName,
+    String roomId,
+  ) async {
+    if (networkManager == null) {
+      throw Exception('NetworkManager not initialized');
+    }
+    await networkManager!.connect(serverUrl, playerName, roomId);
   }
 }

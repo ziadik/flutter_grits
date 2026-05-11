@@ -101,11 +101,23 @@ class NetworkManager {
     String playerName,
     String roomId,
   ) async {
-    _client.connect(serverUrl, playerName, roomId);
+    debugPrint('🔌 NetworkManager.connect called');
+    debugPrint('  Server: $serverUrl');
+    debugPrint('  Player: $playerName');
+    debugPrint('  Room: $roomId');
 
-    // Ждём получения ID игрока
-    await Future.delayed(const Duration(milliseconds: 500));
-    _localPlayerId = _client.playerId;
+    try {
+      // Ждём подтверждения подключения от клиента
+      await _client.connect(serverUrl, playerName, roomId);
+
+      _localPlayerId = _client.playerId;
+
+      debugPrint('✅ NetworkManager connected successfully');
+      debugPrint('  Local player ID: $_localPlayerId');
+    } catch (e) {
+      debugPrint('❌ NetworkManager connection failed: $e');
+      rethrow;
+    }
   }
 
   /// Отправка ввода локального игрока

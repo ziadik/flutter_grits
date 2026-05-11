@@ -91,15 +91,27 @@ class GameClient {
   Map<String, NetworkPlayer> get remotePlayers =>
       Map.unmodifiable(_remotePlayers);
 
+  // Для ожидания подтверждения подключения
+  Completer<String>? _connectCompleter;
+
   /// Подключение к серверу
-  void connect(String serverUrl, String playerName, String roomId) {
+  Future<void> connect(
+    String serverUrl,
+    String playerName,
+    String roomId,
+  ) async {
     if (_connectionState == ConnectionState.connecting ||
         _connectionState == ConnectionState.connected) {
       disconnect();
     }
 
     _currentRoomId = roomId;
+    _connectCompleter = Completer<String>();
     _setConnectionState(ConnectionState.connecting);
+
+    debugPrint('🔗 Connecting to: $serverUrl');
+    debugPrint('👤 Player: $playerName');
+    debugPrint('🏠 Room: $roomId');
 
     try {
       _channel = WebSocketChannel.connect(Uri.parse(serverUrl));
@@ -107,11 +119,17 @@ class GameClient {
       _channel!.stream.listen(
         _handleMessage,
         onError: (error) {
-          debugPrint('WebSocket error: $error');
+          debugPrint('❌ WebSocket error: $error');
+          if (!_connectCompleter!.isCompleted) {
+            _connectCompleter!.completeError('WebSocket error: $error');
+          }
           _handleDisconnect();
         },
         onDone: () {
-          debugPrint('WebSocket closed');
+          debugPrint('🔌 WebSocket closed');
+          if (!_connectCompleter!.isCompleted) {
+            _connectCompleter!.completeError('Connection closed');
+          }
           _handleDisconnect();
         },
       );
@@ -121,10 +139,26 @@ class GameClient {
 
       // Запускаем пинг для поддержания соединения
       _startPing();
+
+      // Ждём подтверждения подключения (timeout 5 секунд)
+      debugPrint('⏳ Waiting for server confirmation...');
+      final playerId = await _connectCompleter!.future.timeout(
+        const Duration(seconds: 5),
+        onTimeout: () {
+          debugPrint('❌ Connection timeout after 5 seconds');
+          throw Exception('Connection timeout. Server not responding.');
+        },
+      );
+
+      debugPrint('✅ Successfully connected as player: $playerId');
     } catch (e) {
-      debugPrint('Failed to connect: $e');
+      debugPrint('❌ Failed to connect: $e');
+      if (!_connectCompleter!.isCompleted) {
+        _connectCompleter!.completeError(e);
+      }
       _setConnectionState(ConnectionState.failed);
       onError?.call(e.toString());
+      rethrow;
     }
   }
 
@@ -278,6 +312,11 @@ class GameClient {
     _setConnectionState(ConnectionState.connected);
 
     debugPrint('✅ Joined room as $_playerId, team: ${data['team']}');
+
+    // Завершаем ожидание подключения
+    if (_connectCompleter != null && !_connectCompleter!.isCompleted) {
+      _connectCompleter!.complete(_playerId);
+    }
 
     // Загружаем начальное состояние
     if (data['gameState'] != null) {

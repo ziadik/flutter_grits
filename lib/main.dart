@@ -51,7 +51,10 @@ class ErrorApp extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Text('❌ Error loading game', style: TextStyle(color: Colors.red, fontSize: 24)),
+              const Text(
+                '❌ Error loading game',
+                style: TextStyle(color: Colors.red, fontSize: 24),
+              ),
               const SizedBox(height: 20),
               Text(error, style: const TextStyle(color: Colors.white)),
               const SizedBox(height: 20),
@@ -78,7 +81,13 @@ class GritsApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(navigatorKey: navigatorKey, debugShowCheckedModeBanner: false, title: 'Grits Game', theme: ThemeData.dark(), home: const ConnectionScreen());
+    return MaterialApp(
+      navigatorKey: navigatorKey,
+      debugShowCheckedModeBanner: false,
+      title: 'Grits Game',
+      theme: ThemeData.dark(),
+      home: const ConnectionScreen(),
+    );
   }
 }
 
@@ -92,7 +101,9 @@ class ConnectionScreen extends StatefulWidget {
 }
 
 class _ConnectionScreenState extends State<ConnectionScreen> {
-  final TextEditingController _serverUrlController = TextEditingController(text: 'ws://localhost:8080');
+  final TextEditingController _serverUrlController = TextEditingController(
+    text: 'ws://localhost:8080',
+  );
   final TextEditingController _playerNameController = TextEditingController();
   final TextEditingController _roomIdController = TextEditingController();
 
@@ -136,21 +147,81 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
       final uri = Uri.parse(serverUrl);
       final httpUrl = 'http://${uri.host}:${uri.port}';
 
+      debugPrint('🔍 Testing connection to: $httpUrl');
+
       final response = await http.get(Uri.parse('$httpUrl/rooms'));
       if (response.statusCode == 200) {
+        debugPrint('✅ Server connected successfully!');
         final List<dynamic> data = jsonDecode(response.body);
         setState(() {
-          _availableRooms = data.map((json) => RoomInfo.fromJson(json)).toList();
+          _availableRooms = data
+              .map((json) => RoomInfo.fromJson(json))
+              .toList();
         });
+        _connectionStatus = 'Connected to server';
+      } else {
+        debugPrint('❌ Server responded with status: ${response.statusCode}');
+        _connectionStatus = 'Server error: ${response.statusCode}';
       }
     } catch (e) {
-      debugPrint('Failed to load rooms: $e');
+      debugPrint('❌ Connection failed: $e');
+      String errorMsg = e.toString();
+      if (errorMsg.length > 50) {
+        errorMsg = errorMsg.substring(0, 50) + '...';
+      }
+      _connectionStatus = 'Failed: $errorMsg';
     } finally {
       if (mounted) {
         setState(() {
           _isLoadingRooms = false;
         });
       }
+    }
+  }
+
+  Future<void> _testConnection() async {
+    setState(() {
+      _connectionStatus = 'Testing...';
+    });
+
+    try {
+      final uri = Uri.parse(_serverUrlController.text);
+      final httpUrl = 'http://${uri.host}:${uri.port}';
+
+      debugPrint('🔍 Testing: $httpUrl');
+
+      // Тестируем ping
+      final pingResponse = await http.get(Uri.parse('$httpUrl/ping'));
+
+      if (pingResponse.statusCode == 200) {
+        final data = jsonDecode(pingResponse.body);
+        debugPrint('✅ Ping successful: $data');
+
+        setState(() {
+          _connectionStatus =
+              '✅ Server OK! Uptime: ${data['uptime']?.toStringAsFixed(1) ?? 0}s';
+        });
+        _showSnackBar('✅ Server is running!');
+
+        // Также загрузим комнаты
+        await _loadRooms();
+      } else {
+        debugPrint('❌ Ping failed with status: ${pingResponse.statusCode}');
+        setState(() {
+          _connectionStatus = '❌ Ping failed: ${pingResponse.statusCode}';
+        });
+        _showSnackBar('❌ Server error: ${pingResponse.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('❌ Test connection error: $e');
+      String errorMsg = e.toString();
+      if (errorMsg.length > 40) {
+        errorMsg = errorMsg.substring(0, 40) + '...';
+      }
+      setState(() {
+        _connectionStatus = '❌ Error: $errorMsg';
+      });
+      _showSnackBar('❌ Cannot connect to server');
     }
   }
 
@@ -171,33 +242,72 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
     });
 
     final roomId = _selectedRoomId ?? _roomIdController.text.trim();
+    final serverUrl = _serverUrlController.text;
+    final playerName = _playerNameController.text.trim();
+
+    debugPrint('🎮 Attempting to connect...');
+    debugPrint('  Server: $serverUrl');
+    debugPrint('  Player: $playerName');
+    debugPrint('  Room: $roomId');
 
     try {
       // Проверяем соединение с сервером
-      final uri = Uri.parse(_serverUrlController.text);
+      final uri = Uri.parse(serverUrl);
       final httpUrl = 'http://${uri.host}:${uri.port}';
 
+      debugPrint('🔍 Checking server ping...');
       final pingResponse = await http.get(Uri.parse('$httpUrl/ping'));
+
       if (pingResponse.statusCode != 200) {
-        throw Exception('Server not responding');
+        debugPrint('❌ Server ping failed: ${pingResponse.statusCode}');
+        throw Exception('Server not responding (${pingResponse.statusCode})');
       }
 
-      // Подключаемся к игре
-      await game.connectToGame(_serverUrlController.text, _playerNameController.text.trim(), roomId);
+      debugPrint('✅ Server ping OK');
+
+      // Проверяем и загружаем gameWorld если нужно
+      debugPrint('🎮 Checking game initialization...');
+      if (game.gameWorld == null) {
+        debugPrint('⏳ GameWorld not loaded yet, loading...');
+        await game.onLoad();
+        debugPrint('✅ GameWorld loaded successfully');
+      } else {
+        debugPrint('✅ GameWorld already loaded');
+      }
+
+      // Подключаемся к игре (используем глобальный game)
+      debugPrint('🔗 Connecting to game...');
+      await game.connectToGame(serverUrl, playerName, roomId);
+      debugPrint('✅ Game connected successfully');
 
       // Ждём подтверждения подключения
       await Future.delayed(const Duration(seconds: 1));
 
       if (mounted) {
+        debugPrint('🚀 Navigating to game screen...');
         // Переходим в игру
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => GameScreen()));
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => GameScreen()),
+        );
       }
-    } catch (e) {
-      setState(() {
-        _connectionStatus = 'Connection failed: $e';
-        _isConnecting = false;
-      });
-      _showSnackBar('Connection failed: $e');
+    } catch (e, stackTrace) {
+      debugPrint('❌ Connection error: $e');
+      debugPrint('Stack trace: $stackTrace');
+
+      // Безопасная обрезка строки ошибки
+      String errorMsg = e.toString();
+      if (errorMsg.length > 60) {
+        errorMsg = errorMsg.substring(0, 60) + '...';
+      }
+
+      if (mounted) {
+        setState(() {
+          _connectionStatus = 'Connection failed: $errorMsg';
+          _isConnecting = false;
+        });
+        _showSnackBar('Connection failed: $errorMsg');
+      }
     }
   }
 
@@ -217,7 +327,11 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
       final uri = Uri.parse(_serverUrlController.text);
       final httpUrl = 'http://${uri.host}:${uri.port}';
 
-      await http.post(Uri.parse('$httpUrl/create-room'), headers: {'Content-Type': 'application/json'}, body: jsonEncode({'roomId': newRoomId, 'maxPlayers': 4}));
+      await http.post(
+        Uri.parse('$httpUrl/create-room'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'roomId': newRoomId, 'maxPlayers': 4}),
+      );
     } catch (e) {
       debugPrint('Create room API error: $e');
     }
@@ -227,7 +341,9 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
   }
 
   void _showSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message), duration: const Duration(seconds: 2)));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), duration: const Duration(seconds: 2)),
+    );
   }
 
   @override
@@ -244,7 +360,11 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
       backgroundColor: Colors.black,
       body: Container(
         decoration: BoxDecoration(
-          gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Colors.grey[900]!, Colors.black]),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Colors.grey[900]!, Colors.black],
+          ),
         ),
         child: SafeArea(
           child: Center(
@@ -260,7 +380,12 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
                   const Text(
                     'GRITS GAME',
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 4),
+                    style: TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      letterSpacing: 4,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Text(
@@ -272,8 +397,14 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
 
                   // Статус подключения
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(color: Colors.grey[800], borderRadius: BorderRadius.circular(8)),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[800],
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                     child: Row(
                       children: [
                         Icon(
@@ -291,7 +422,13 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
                         ),
                         const SizedBox(width: 8),
                         Expanded(
-                          child: Text(_connectionStatus, style: TextStyle(color: Colors.grey[300], fontSize: 12)),
+                          child: Text(
+                            _connectionStatus,
+                            style: TextStyle(
+                              color: Colors.grey[300],
+                              fontSize: 12,
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -305,7 +442,10 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
                     decoration: InputDecoration(
                       labelText: 'Server URL',
                       labelStyle: TextStyle(color: Colors.grey[400]),
-                      prefixIcon: const Icon(Icons.dns, color: Colors.blueAccent),
+                      prefixIcon: const Icon(
+                        Icons.dns,
+                        color: Colors.blueAccent,
+                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                         borderSide: BorderSide(color: Colors.grey[700]!),
@@ -331,7 +471,10 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
                     decoration: InputDecoration(
                       labelText: 'Player Name',
                       labelStyle: TextStyle(color: Colors.grey[400]),
-                      prefixIcon: const Icon(Icons.person, color: Colors.blueAccent),
+                      prefixIcon: const Icon(
+                        Icons.person,
+                        color: Colors.blueAccent,
+                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                         borderSide: BorderSide(color: Colors.grey[700]!),
@@ -356,7 +499,13 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
                       Expanded(child: Divider(color: Colors.grey[700])),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Text('OR SELECT ROOM', style: TextStyle(color: Colors.grey[500], fontSize: 12)),
+                        child: Text(
+                          'OR SELECT ROOM',
+                          style: TextStyle(
+                            color: Colors.grey[500],
+                            fontSize: 12,
+                          ),
+                        ),
                       ),
                       Expanded(child: Divider(color: Colors.grey[700])),
                     ],
@@ -372,7 +521,10 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
                     ),
                     child: _isLoadingRooms
                         ? const Center(
-                            child: Padding(padding: EdgeInsets.all(32), child: CircularProgressIndicator()),
+                            child: Padding(
+                              padding: EdgeInsets.all(32),
+                              child: CircularProgressIndicator(),
+                            ),
                           )
                         : _availableRooms.isEmpty
                         ? Center(
@@ -391,12 +543,29 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
                               final room = _availableRooms[index];
                               final isSelected = _selectedRoomId == room.id;
                               return ListTile(
-                                leading: Icon(Icons.meeting_room, color: room.players >= room.maxPlayers ? Colors.red : Colors.green),
-                                title: Text(room.id, style: const TextStyle(color: Colors.white)),
-                                subtitle: Text('Players: ${room.players}/${room.maxPlayers} • ${room.state}', style: TextStyle(color: Colors.grey[500])),
-                                trailing: isSelected ? const Icon(Icons.check_circle, color: Colors.green) : null,
+                                leading: Icon(
+                                  Icons.meeting_room,
+                                  color: room.players >= room.maxPlayers
+                                      ? Colors.red
+                                      : Colors.green,
+                                ),
+                                title: Text(
+                                  room.id,
+                                  style: const TextStyle(color: Colors.white),
+                                ),
+                                subtitle: Text(
+                                  'Players: ${room.players}/${room.maxPlayers} • ${room.state}',
+                                  style: TextStyle(color: Colors.grey[500]),
+                                ),
+                                trailing: isSelected
+                                    ? const Icon(
+                                        Icons.check_circle,
+                                        color: Colors.green,
+                                      )
+                                    : null,
                                 selected: isSelected,
-                                selectedTileColor: Colors.blueAccent.withOpacity(0.2),
+                                selectedTileColor: Colors.blueAccent
+                                    .withOpacity(0.2),
                                 onTap: room.players < room.maxPlayers
                                     ? () {
                                         setState(() {
@@ -418,7 +587,10 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
                     decoration: InputDecoration(
                       labelText: 'Room ID',
                       labelStyle: TextStyle(color: Colors.grey[400]),
-                      prefixIcon: const Icon(Icons.key, color: Colors.blueAccent),
+                      prefixIcon: const Icon(
+                        Icons.key,
+                        color: Colors.blueAccent,
+                      ),
                       hintText: 'Or enter room ID manually',
                       hintStyle: TextStyle(color: Colors.grey[600]),
                       border: OutlineInputBorder(
@@ -451,21 +623,34 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
                     children: [
                       Expanded(
                         child: OutlinedButton.icon(
+                          onPressed: _isConnecting ? null : _testConnection,
+                          icon: const Icon(Icons.bug_report),
+                          label: const Text('Test'),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            side: BorderSide(color: Colors.orange[700]!),
+                            foregroundColor: Colors.orange,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
                           onPressed: _isConnecting ? null : _loadRooms,
                           icon: const Icon(Icons.refresh),
-                          label: const Text('Refresh Rooms'),
+                          label: const Text('Refresh'),
                           style: OutlinedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 14),
                             side: BorderSide(color: Colors.grey[600]!),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: OutlinedButton.icon(
                           onPressed: _isConnecting ? null : _createNewRoom,
                           icon: const Icon(Icons.add),
-                          label: const Text('Create Room'),
+                          label: const Text('Create'),
                           style: OutlinedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 14),
                             side: BorderSide(color: Colors.green[700]!),
@@ -483,11 +668,26 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       backgroundColor: Colors.blueAccent,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
                     child: _isConnecting
-                        ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                        : const Text('CONNECT', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text(
+                            'CONNECT',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                   ),
 
                   const SizedBox(height: 24),
@@ -495,19 +695,44 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
                   // Информация о сервере
                   Container(
                     padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(color: Colors.grey[900], borderRadius: BorderRadius.circular(8)),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[900],
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                     child: Column(
                       children: [
                         Row(
                           children: [
-                            Icon(Icons.info_outline, size: 16, color: Colors.grey[500]),
+                            Icon(
+                              Icons.info_outline,
+                              size: 16,
+                              color: Colors.grey[500],
+                            ),
                             const SizedBox(width: 8),
-                            Text('Server Info', style: TextStyle(color: Colors.grey[400], fontSize: 12)),
+                            Text(
+                              'Server Info',
+                              style: TextStyle(
+                                color: Colors.grey[400],
+                                fontSize: 12,
+                              ),
+                            ),
                           ],
                         ),
                         const SizedBox(height: 8),
-                        Text('Default server: ws://localhost:8080', style: TextStyle(color: Colors.grey[600], fontSize: 11)),
-                        Text('Make sure the server is running', style: TextStyle(color: Colors.grey[600], fontSize: 11)),
+                        Text(
+                          'Default server: ws://localhost:8080',
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 11,
+                          ),
+                        ),
+                        Text(
+                          'Make sure the server is running',
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 11,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -564,7 +789,10 @@ class _GameScreenState extends State<GameScreen> {
             children: [
               const Icon(Icons.error, size: 64, color: Colors.red),
               const SizedBox(height: 16),
-              Text('Error: $_errorMessage', style: const TextStyle(color: Colors.white)),
+              Text(
+                'Error: $_errorMessage',
+                style: const TextStyle(color: Colors.white),
+              ),
               const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: () {
@@ -617,9 +845,19 @@ class RoomInfo {
   final int maxPlayers;
   final String state;
 
-  RoomInfo({required this.id, required this.players, required this.maxPlayers, required this.state});
+  RoomInfo({
+    required this.id,
+    required this.players,
+    required this.maxPlayers,
+    required this.state,
+  });
 
   factory RoomInfo.fromJson(Map<String, dynamic> json) {
-    return RoomInfo(id: json['id'] ?? '', players: json['players'] ?? 0, maxPlayers: json['maxPlayers'] ?? 4, state: json['state'] ?? 'waiting');
+    return RoomInfo(
+      id: json['id'] ?? '',
+      players: json['players'] ?? 0,
+      maxPlayers: json['maxPlayers'] ?? 4,
+      state: json['state'] ?? 'waiting',
+    );
   }
 }

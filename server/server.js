@@ -496,32 +496,61 @@ app.use(express.static("public"));
 // Хранилище активных соединений
 const clients = new Map(); // ws -> { room, playerId }
 
-wss.on("connection", (ws) => {
+wss.on("connection", (ws, req) => {
   serverStats.totalConnections++;
-  const clientId = `client_${serverStats.totalConnections}`;
-  logger.info(`🔌 Новое WebSocket соединение`, { clientId, ip: ws._socket.remoteAddress });
+  const clientId = `client_${serverStats.totalConnections}_${Date.now()}`;
+  const ip = req.socket.remoteAddress || 'unknown';
+  const port = req.socket.remotePort || 0;
+  
+  logger.info(`🔌 Новое WebSocket соединение`, { 
+    clientId, 
+    ip, 
+    port,
+    userAgent: req.headers['user-agent'] || 'unknown'
+  });
 
   let currentRoom = null;
   let currentPlayerId = null;
   let lastInputTime = Date.now();
   let messageCount = 0;
+  let connectTime = Date.now();
 
   ws.on("message", (data) => {
     serverStats.totalMessages++;
     messageCount++;
     try {
       const message = JSON.parse(data.toString());
-      logger.debug(`📩 Сообщение от ${clientId}`, { clientId, type: message.type, count: messageCount });
+      logger.debug(`📩 Сообщение от ${clientId}`, { 
+        clientId, 
+        type: message.type, 
+        count: messageCount,
+        roomId: message.roomId,
+        playerName: message.playerName
+      });
       handleMessage(ws, message);
     } catch (e) {
       serverStats.errors++;
-      logger.error(`❌ Ошибка парсинга сообщения от ${clientId}`, { clientId, error: e.message });
+      logger.error(`❌ Ошибка парсинга сообщения от ${clientId}`, { 
+        clientId, 
+        error: e.message,
+        data: data.toString().substring(0, 100)
+      });
     }
   });
 
-  ws.on("close", () => {
+  ws.on("close", (code, reason) => {
+    const disconnectTime = Date.now();
+    const sessionDuration = ((disconnectTime - connectTime) / 1000).toFixed(2);
     serverStats.totalDisconnections++;
-    logger.info(`🔌 WebSocket соединение закрыто`, { clientId, messagesReceived: messageCount });
+    
+    logger.info(`🔌 WebSocket соединение закрыто`, { 
+      clientId, 
+      messagesReceived: messageCount,
+      sessionDuration: `${sessionDuration}s`,
+      code,
+      reason: reason ? reason.toString().substring(0, 50) : ''
+    });
+    
     if (currentRoom && currentPlayerId) {
       const room = rooms.get(currentRoom);
       if (room) {
@@ -540,11 +569,23 @@ wss.on("connection", (ws) => {
               reason: "Недостаточно игроков",
             });
             room.state = "ended";
-            logger.info(`🏁 Игра завершена в комнате ${currentRoom}`, { reason: "Недостаточно игроков" });
+            logger.info(`🏁 Игра завершена в комнате ${currentRoom}`, { 
+              reason: "Недостаточно игроков",
+              remainingPlayers: room.players.size
+            });
           }
         }
       }
     }
+  });
+
+  ws.on("error", (error) => {
+    serverStats.errors++;
+    logger.error(`❌ Ошибка WebSocket для ${clientId}`, { 
+      clientId, 
+      error: error.message,
+      code: error.code
+    });
   });
 
   function handleMessage(ws, msg) {
@@ -578,12 +619,20 @@ wss.on("connection", (ws) => {
 
   function handleJoin(ws, msg) {
     const { playerName, roomId } = msg;
-    logger.info(`🎯 Попытка подключения игрока`, { playerName, roomId });
+    logger.info(`🎯 Попытка подключения игрока`, { 
+      playerName,
+      roomId,
+      clientId: clientId
+    });
 
     let room = rooms.get(roomId);
     if (!room) {
       if (rooms.size > 50) {
-        logger.warn(`❌ Сервер перегружен`, { roomId, currentRooms: rooms.size });
+        logger.warn(`❌ Сервер перегружен`, { 
+          roomId, 
+          currentRooms: rooms.size,
+          clientId 
+        });
         ws.send(
           JSON.stringify({ type: "error", message: "Сервер перегружен" }),
         );
@@ -594,7 +643,11 @@ wss.on("connection", (ws) => {
     }
 
     if (room.players.size >= GAME_CONFIG.maxPlayersPerRoom) {
-      logger.warn(`❌ Комната полна`, { roomId, playerCount: room.players.size });
+      logger.warn(`❌ Комната полна`, { 
+        roomId, 
+        playerCount: room.players.size,
+        clientId 
+      });
       ws.send(JSON.stringify({ type: "error", message: "Комната полна" }));
       return;
     }
@@ -602,11 +655,14 @@ wss.on("connection", (ws) => {
     const player = room.addPlayer(ws, playerName);
     currentRoom = room.id;
     currentPlayerId = player.id;
+    
     logger.info(`✅ Игрок подключился к комнате`, {
       playerId: player.id,
       playerName,
       roomId,
       team: player.team,
+      clientId,
+      totalPlayersInRoom: room.players.size
     });
 
     // Отправляем подтверждение с начальным состоянием
@@ -679,16 +735,30 @@ wss.on("connection", (ws) => {
 
   function handleShoot(msg) {
     if (!currentRoom || !currentPlayerId) {
-      logger.warn(`⚠️ Попытка выстрела без подключения`, { currentRoom, currentPlayerId });
+      logger.warn(`⚠️ Попытка выстрела без подключения`, { 
+        currentRoom, 
+        currentPlayerId,
+        clientId 
+      });
       return;
     }
 
     const room = rooms.get(currentRoom);
-    if (!room) return;
+    if (!room) {
+      logger.warn(`⚠️ Комната не найдена для выстрела`, { 
+        currentRoom,
+        clientId 
+      });
+      return;
+    }
 
     const player = room.players.get(currentPlayerId);
     if (!player || player.isDead) {
-      logger.warn(`⚠️ Недействительный игрок для выстрела`, { playerId: currentPlayerId, isDead: player?.isDead });
+      logger.warn(`⚠️ Недействительный игрок для выстрела`, { 
+        playerId: currentPlayerId, 
+        isDead: player?.isDead,
+        clientId 
+      });
       return;
     }
 
@@ -696,8 +766,10 @@ wss.on("connection", (ws) => {
     if (player.energy < weaponCost) {
       logger.debug(`⚡ Недостаточно энергии для выстрела`, {
         playerId: currentPlayerId,
+        playerName: player.name,
         energy: player.energy,
         required: weaponCost,
+        clientId
       });
       return;
     }
@@ -705,9 +777,13 @@ wss.on("connection", (ws) => {
     player.energy -= weaponCost;
     logger.debug(`🔫 Выстрел игрока`, {
       playerId: currentPlayerId,
+      playerName: player.name,
       weaponSlot: player.weaponSlot,
       energyCost: weaponCost,
       remainingEnergy: player.energy,
+      position: player.position,
+      angle: player.angle,
+      clientId
     });
 
     room.broadcast(
@@ -933,9 +1009,27 @@ server.listen(PORT, () => {
 // Обработка ошибок сервера
 server.on('error', (err) => {
   serverStats.errors++;
-  logger.error(`❌ Ошибка сервера`, { error: err.message, code: err.code });
+  
   if (err.code === 'EADDRINUSE') {
-    console.error(`Порт ${PORT} занят. Используйте другой порт или освободите текущий.`);
+    console.error(`\n❌ ОШИБКА: Порт ${PORT} уже занят!`);
+    console.error(`\nВозможные решения:`);
+    console.error(`1. Найдите и завершите процесс: lsof -ti:${PORT} | xargs kill -9`);
+    console.error(`2. Или используйте другой порт: PORT=3000 npm start\n`);
+    
+    // Автоматически пробуем освободить порт
+    const { exec } = require('child_process');
+    exec(`lsof -ti:${PORT} | xargs kill -9`, (error) => {
+      if (error) {
+        console.error(`Не удалось освободить порт. Пожалуйста, сделайте это вручную.`);
+        process.exit(1);
+      } else {
+        console.log(`✅ Порт ${PORT} освобождён. Перезапускаем сервер...`);
+        server.listen(PORT);
+      }
+    });
+  } else {
+    logger.error(`❌ Ошибка сервера`, { error: err.message, code: err.code });
+    process.exit(1);
   }
 });
 

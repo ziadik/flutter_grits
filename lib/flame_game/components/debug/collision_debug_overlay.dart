@@ -43,7 +43,9 @@ class CollisionDebugOverlay extends PositionComponent {
       _renderInteractiveItems(canvas);
     }
 
-    if (showPlayerBounds && gameWorld.player.isLoaded) {
+    if (showPlayerBounds &&
+        gameWorld.player != null &&
+        gameWorld.player!.isLoaded) {
       _renderPlayerBounds(canvas);
     }
   }
@@ -51,6 +53,8 @@ class CollisionDebugOverlay extends PositionComponent {
   /// Отрисовка границ игрока
   void _renderPlayerBounds(Canvas canvas) {
     final player = gameWorld.player;
+    if (player == null) return;
+
     final halfSize = 32.0;
 
     // Основной прямоугольник игрока

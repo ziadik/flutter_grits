@@ -44,7 +44,9 @@ class MinimapComponent extends PositionComponent {
   }
 
   void _drawPlayerOnMinimap(Canvas canvas) {
-    final playerPos = world.player.position;
+    if (world.player == null) return;
+
+    final playerPos = world.player!.position;
     final mapSize = Vector2(
       world.mapWidth.toDouble(),
       world.mapHeight.toDouble(),

@@ -2,7 +2,13 @@
 import 'package:flame/camera.dart';
 import 'package:flame/components.dart';
 import 'package:flame/game.dart';
-import 'package:flame/events.dart' show KeyboardEvents, PointerMoveCallbacks, TapCallbacks, TapDownEvent, TapUpEvent;
+import 'package:flame/events.dart'
+    show
+        KeyboardEvents,
+        PointerMoveCallbacks,
+        TapCallbacks,
+        TapDownEvent,
+        TapUpEvent;
 
 import 'package:flame/src/events/messages/pointer_move_event.dart';
 import 'package:flutter/gestures.dart' hide PointerMoveEvent;
@@ -23,10 +29,15 @@ import 'package:flutter_grits/flame_game/widgets/settings_dialog.dart';
 import 'package:flutter_grits/main.dart' show navigatorKey;
 import 'package:flutter/material.dart' hide PointerMoveEvent;
 
-class GritsGame extends FlameGame with KeyboardEvents, TapCallbacks, PointerMoveCallbacks, HasCollisionDetection {
+class GritsGame extends FlameGame
+    with
+        KeyboardEvents,
+        TapCallbacks,
+        PointerMoveCallbacks,
+        HasCollisionDetection {
   final ResourceManager resourceManager;
   late InputManager inputManager;
-  late GameWorld gameWorld;
+  GameWorld? gameWorld;
   CollisionDebugOverlay? _collisionDebugOverlay;
   bool _debugModeEnabled = false;
 
@@ -37,8 +48,46 @@ class GritsGame extends FlameGame with KeyboardEvents, TapCallbacks, PointerMove
 
   GritsGame({required this.resourceManager}) : super();
 
-  Future<void> connectToGame(String serverUrl, String playerName, String roomId) async {
-    await gameWorld.connectToServer(serverUrl, playerName, roomId);
+  Future<void> connectToGame(
+    String serverUrl,
+    String playerName,
+    String roomId,
+  ) async {
+    debugPrint('🔗 connectToGame called');
+    debugPrint('  gameWorld is null: ${gameWorld == null}');
+
+    // Проверяем что gameWorld инициализирован
+    if (gameWorld == null) {
+      throw Exception('GameWorld not initialized. Call onLoad() first.');
+    }
+
+    debugPrint(
+      '  gameWorld.networkManager is null: ${gameWorld!.networkManager == null}',
+    );
+    debugPrint('🔗 GritsGame.connectToGame called, checking networkManager...');
+
+    // Ждём пока networkManager инициализируется (в onMount после onLoad)
+    int attempts = 0;
+    while (gameWorld!.networkManager == null && attempts < 30) {
+      debugPrint('  Waiting for networkManager... attempt $attempts');
+      await Future.delayed(const Duration(milliseconds: 100));
+      attempts++;
+    }
+
+    if (gameWorld!.networkManager == null) {
+      debugPrint('❌ networkManager still null after ${attempts * 100}ms');
+      throw Exception(
+        'NetworkManager not initialized after ${attempts * 100}ms',
+      );
+    }
+
+    debugPrint('✅ NetworkManager is ready!');
+    debugPrint('🔗 Connecting to server...');
+    debugPrint('  Server: $serverUrl');
+    debugPrint('  Player: $playerName');
+    debugPrint('  Room: $roomId');
+
+    await gameWorld!.networkManager!.connect(serverUrl, playerName, roomId);
   }
 
   /// Метод для показа диалога настроек из Flame компонента
@@ -73,10 +122,13 @@ class GritsGame extends FlameGame with KeyboardEvents, TapCallbacks, PointerMove
     inputManager = InputManager();
 
     // Создаем игровой мир
-    gameWorld = GameWorld(resourceManager: resourceManager, inputManager: inputManager);
+    gameWorld = GameWorld(
+      resourceManager: resourceManager,
+      inputManager: inputManager,
+    );
 
     // Добавляем мир вручную (не через world)
-    await add(gameWorld);
+    await add(gameWorld!);
 
     // Ждем пока игрок будет готов (с таймаутом)
     await _waitForPlayer();
@@ -93,7 +145,7 @@ class GritsGame extends FlameGame with KeyboardEvents, TapCallbacks, PointerMove
     // Ждем пока игрок будет доступен (макс 3 секунды)
     int attempts = 0;
     while (attempts < 30) {
-      if (gameWorld.player.isLoaded) {
+      if (gameWorld?.player?.isLoaded == true) {
         return;
       }
       await Future.delayed(const Duration(milliseconds: 100));
@@ -103,16 +155,19 @@ class GritsGame extends FlameGame with KeyboardEvents, TapCallbacks, PointerMove
 
   Future<void> _setupCamera() async {
     // Проверяем что игрок загружен
-    if (!gameWorld.player.isLoaded) {
-      await gameWorld.player.onLoad();
+    if (gameWorld?.player?.isLoaded == false) {
+      await gameWorld!.player!.onLoad();
     }
 
     // Создаем камеру с фиксированным размером вьюпорта
-    camera = CameraComponent(viewport: FixedSizeViewport(800, 800), world: gameWorld);
+    camera = CameraComponent(
+      viewport: FixedSizeViewport(800, 800),
+      world: gameWorld,
+    );
 
     // Настраиваем мгновенное слежение за игроком (без плавности)
     camera.follow(
-      gameWorld.player,
+      gameWorld!.player!,
       // anchor: Anchor.center,
       maxSpeed: 10000, // Максимально высокая скорость
     );
@@ -123,16 +178,41 @@ class GritsGame extends FlameGame with KeyboardEvents, TapCallbacks, PointerMove
     // Настраиваем HUD после добавления камеры
     _setupHUD();
 
+    // Ждём пока networkManager создастся и добавляем ConnectionStatusComponent
+    if (gameWorld != null) {
+      int attempts = 0;
+      while (gameWorld!.networkManager == null && attempts < 30) {
+        await Future.delayed(const Duration(milliseconds: 100));
+        attempts++;
+      }
+      if (gameWorld!.networkManager != null) {
+        _addConnectionStatus();
+      }
+    }
+
     // Запускаем фоновую музыку только после первого взаимодействия пользователя
     // SoundManager().playBackgroundMusic(SoundAssets.bgGame);
     // Музыка запустится при первом клике/нажатии через onUserInteraction()
+  }
+
+  void _addConnectionStatus() {
+    if (gameWorld?.networkManager != null) {
+      final connectionStatus = ConnectionStatusComponent(
+        gameClient: gameWorld!.networkManager!.client,
+        position: Vector2(10, 10),
+      );
+      camera.viewport.add(connectionStatus);
+    }
   }
 
   void _setupHUD() {
     final screenSize = camera.viewport.size;
 
     // FPS счетчик
-    final fpsCounter = FpsCounterComponent(position: Vector2(screenSize.x - 50, 30), anchor: Anchor.topRight);
+    final fpsCounter = FpsCounterComponent(
+      position: Vector2(screenSize.x - 50, 30),
+      anchor: Anchor.topRight,
+    );
     camera.viewport.add(fpsCounter);
 
     // Кнопка настроек (слева от FPS)
@@ -146,24 +226,29 @@ class GritsGame extends FlameGame with KeyboardEvents, TapCallbacks, PointerMove
     camera.viewport.add(_settingsButton!);
 
     // Мини-карта
-    final minimap = MinimapComponent(position: Vector2(20, screenSize.y - 40), size: Vector2(180, 180), world: gameWorld, camera: camera);
+    final minimap = MinimapComponent(
+      position: Vector2(20, screenSize.y - 40),
+      size: Vector2(180, 180),
+      world: gameWorld!,
+      camera: camera,
+    );
     camera.viewport.add(minimap);
-    // Индикатор статуса подключения
-    final connectionStatus = ConnectionStatusComponent(gameClient: gameWorld.networkManager.client, position: Vector2(10, 10));
-    camera.viewport.add(connectionStatus);
     // Индикатор оружия
     Future.delayed(const Duration(milliseconds: 100), () {
-      if (gameWorld.player.isLoaded) {
+      if (gameWorld?.player?.isLoaded == true) {
         _addWeaponIndicator();
-      } else {
-        gameWorld.player.onLoad().then((_) => _addWeaponIndicator());
+      } else if (gameWorld?.player != null) {
+        gameWorld!.player!.onLoad().then((_) => _addWeaponIndicator());
       }
     });
   }
 
   void _addWeaponIndicator() {
     // Индикатор оружия
-    WeaponIndicatorComponent.create(player: gameWorld.player, position: Vector2(20, 20)).then((indicator) {
+    WeaponIndicatorComponent.create(
+      player: gameWorld!.player!,
+      position: Vector2(20, 20),
+    ).then((indicator) {
       camera.viewport.add(indicator);
       // debugPrint('✅ Weapon indicator added to HUD');
     });
@@ -192,7 +277,10 @@ class GritsGame extends FlameGame with KeyboardEvents, TapCallbacks, PointerMove
   }
 
   @override
-  KeyEventResult onKeyEvent(KeyEvent event, Set<LogicalKeyboardKey> keysPressed) {
+  KeyEventResult onKeyEvent(
+    KeyEvent event,
+    Set<LogicalKeyboardKey> keysPressed,
+  ) {
     // Обработка F1 - переключение отладочного оверлея
     if (event is KeyDownEvent && keysPressed.contains(LogicalKeyboardKey.f1)) {
       _toggleDebugOverlay();
@@ -208,13 +296,20 @@ class GritsGame extends FlameGame with KeyboardEvents, TapCallbacks, PointerMove
     _debugModeEnabled = !_debugModeEnabled;
 
     if (_debugModeEnabled) {
-      if (_collisionDebugOverlay == null) {
-        _collisionDebugOverlay = CollisionDebugOverlay(gameWorld: gameWorld, showPlayerBounds: true, showCollisionTiles: true, showInteractiveItems: true);
+      if (_collisionDebugOverlay == null && gameWorld != null) {
+        _collisionDebugOverlay = CollisionDebugOverlay(
+          gameWorld: gameWorld!,
+          showPlayerBounds: true,
+          showCollisionTiles: true,
+          showInteractiveItems: true,
+        );
       }
 
       // Добавляем оверлей В МИР, а не на камеру
-      if (!gameWorld.children.contains(_collisionDebugOverlay)) {
-        gameWorld.add(_collisionDebugOverlay!);
+      if (gameWorld != null &&
+          _collisionDebugOverlay != null &&
+          !gameWorld!.children.contains(_collisionDebugOverlay)) {
+        gameWorld!.add(_collisionDebugOverlay!);
         // debugPrint('🔍 Отладочный режим: ВКЛЮЧЕН');
       }
     } else {
@@ -229,8 +324,8 @@ class GritsGame extends FlameGame with KeyboardEvents, TapCallbacks, PointerMove
   /// Обработка переключения оружия клавишами 1, 2, 3
   void _handleWeaponSwitching() {
     final slot = inputManager.getWeaponSlotKeyPress();
-    if (slot != null && gameWorld.player != null) {
-      gameWorld.player.selectWeapon(slot);
+    if (slot != null && gameWorld?.player != null) {
+      gameWorld!.player!.selectWeapon(slot);
     }
   }
 
@@ -280,8 +375,8 @@ class GritsGame extends FlameGame with KeyboardEvents, TapCallbacks, PointerMove
     super.update(dt);
 
     // Обновляем систему спавна
-    if (gameWorld != null) {
-      gameWorld.updateSpawners(dt);
+    if (gameWorld != null && isMounted) {
+      gameWorld!.updateSpawners(dt);
 
       // Обработка переключения оружия
       _handleWeaponSwitching();

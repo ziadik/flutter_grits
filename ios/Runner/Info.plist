@@ -66,5 +66,18 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>This app needs local network access to connect to the game server.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_http._tcp</string>
+	</array>
+	<key>AllowHTTPTraffic</key>
+	<true/>
+	<key>AppTransportSecuritySettings</key>
+	<dict>
+		<key>AllowArbitraryLoads</key>
+		<true/>
+	</dict>
 </dict>
 </plist>
