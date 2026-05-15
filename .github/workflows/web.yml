@@ -27,14 +27,7 @@ jobs:
           flutter pub get
       
       - name: Build Web
-        run: |
-          # Проверяем версию Flutter и используем правильные флаги
-          FLUTTER_VERSION=$(flutter --version | head -n1 | grep -oP '\d+\.\d+\.\d+')
-          if [[ "$FLUTTER_VERSION" > "3.16.0" ]]; then
-            flutter build web --release --web-renderer html --base-href /flutter_grits/
-          else
-            flutter build web --release --base-href /flutter_grits/
-          fi
+        run: flutter build web --release --base-href /flutter_grits/
       
       - name: Fix missing web files
         run: |
@@ -50,10 +43,10 @@ jobs:
           EOF
           
           # Создаем простой favicon
-          echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==" | base64 -d > favicon.png
+          printf '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\rIDATx\x9cc\xf8\xcfP\x0f\x00\x03\x06\x01\x01\xa5\xb4Q\xa7\x00\x00\x00\x00IEND\xaeB`\x82' > favicon.png
           
-          # Обновляем index.html
-          sed -i 's/<\/body>/<script>if("serviceWorker" in navigator){navigator.serviceWorker.getRegistrations().then(function(r){for(let registration of r){registration.unregister()}})}<\/script><\/body>/' index.html
+          # Добавляем скрипт для отключения service workers
+          sed -i 's|</body>|<script>if("serviceWorker" in navigator){navigator.serviceWorker.getRegistrations().then(function(r){for(let registration of r){registration.unregister()}})}</script></body>|' index.html
       
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
