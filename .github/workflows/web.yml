@@ -27,7 +27,14 @@ jobs:
           flutter pub get
       
       - name: Build Web
-        run: flutter build web --release --web-renderer html
+        run: |
+          # Проверяем версию Flutter и используем правильные флаги
+          FLUTTER_VERSION=$(flutter --version | head -n1 | grep -oP '\d+\.\d+\.\d+')
+          if [[ "$FLUTTER_VERSION" > "3.16.0" ]]; then
+            flutter build web --release --web-renderer html --base-href /flutter_grits/
+          else
+            flutter build web --release --base-href /flutter_grits/
+          fi
       
       - name: Fix missing web files
         run: |
@@ -42,12 +49,10 @@ jobs:
           }
           EOF
           
-          # Создаем простой favicon (если нет)
-          if [ ! -f favicon.png ]; then
-            echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==" | base64 -d > favicon.png
-          fi
+          # Создаем простой favicon
+          echo "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==" | base64 -d > favicon.png
           
-          # Обновляем index.html чтобы отключить service workers
+          # Обновляем index.html
           sed -i 's/<\/body>/<script>if("serviceWorker" in navigator){navigator.serviceWorker.getRegistrations().then(function(r){for(let registration of r){registration.unregister()}})}<\/script><\/body>/' index.html
       
       - name: Deploy to GitHub Pages
