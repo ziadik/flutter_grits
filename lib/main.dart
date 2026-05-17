@@ -123,42 +123,34 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
 
   // Логгер событий
   final EventsLogger _eventLogger = EventsLogger();
-  bool _showEventsPanel = false;
+  bool _showEventsPanel = true; // По умолчанию показываем панель событий
 
-  // Флаг готовности игры
-  bool _isGameInitialized = false;
+  // Флаг готовности игры - ИЗМЕНЕНО: по умолчанию true
+  bool _isGameInitialized = true;
 
   @override
   void initState() {
     super.initState();
     _playerNameController.text = 'Player${Random().nextInt(1000)}';
+
+    // Инициализируем игру асинхронно
+    _initializeGameAsync();
+
+    // Загружаем комнаты
     _loadRooms();
 
-    // Инициализируем игру сразу после загрузки экрана
-    _initializeGame();
-
     // Автообновление списка комнат каждые 5 секунд
-    Future.delayed(Duration.zero, () {
-      _startAutoRefresh();
-    });
+    _startAutoRefresh();
   }
 
-  Future<void> _initializeGame() async {
+  Future<void> _initializeGameAsync() async {
     try {
-      debugPrint('🎮 Initializing game...');
+      debugPrint('🎮 Initializing game asynchronously...');
 
-      // Убеждаемся, что gameWorld создан
-      if (game.gameWorld == null) {
-        debugPrint('  Creating GameWorld...');
-        game.gameWorld = GameWorld(
-          resourceManager: game.resourceManager,
-          inputManager: game
-              .inputManager, // Теперь inputManager уже должен быть инициализирован
-        );
-        debugPrint('  ✅ GameWorld created');
-      }
+      // Даем время на инициализацию
+      await Future.delayed(const Duration(milliseconds: 500));
 
-      // Вызываем onLoad для инициализации игры
+      // Вызываем onLoad для инициализации игры (создаёт inputManager)
       debugPrint('  Calling game.onLoad()...');
       await game.onLoad();
       debugPrint('  ✅ Game.onLoad() completed');
@@ -166,29 +158,49 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
       // Ждем инициализации NetworkManager
       debugPrint('  Waiting for NetworkManager initialization...');
       int attempts = 0;
-      while (game.gameWorld?.networkManager == null && attempts < 30) {
+      while (game.gameWorld?.networkManager == null && attempts < 50) {
         await Future.delayed(const Duration(milliseconds: 100));
         attempts++;
       }
 
       if (game.gameWorld?.networkManager != null) {
         debugPrint('  ✅ NetworkManager initialized');
-        setState(() {
-          _isGameInitialized = true;
-          _connectionStatus = 'Game ready';
-        });
+        // Настраиваем связь между логгером и клиентом
+        final networkManager = game.gameWorld!.networkManager!;
+        _eventLogger.onSendEventToServer = (eventData) {
+          networkManager.client.sendEventToServer(
+            type: eventData['type'] as String,
+            roomId: eventData['roomId'] as String?,
+            playerId: eventData['playerId'] as String?,
+            message: eventData['message'] as String?,
+            data: eventData['data'],
+          );
+        };
+
+        if (mounted) {
+          setState(() {
+            _isGameInitialized = true;
+            _connectionStatus = 'Game ready';
+          });
+        }
       } else {
         debugPrint('  ⚠️ NetworkManager not initialized yet');
-        setState(() {
-          _connectionStatus = 'Game initializing...';
-        });
+        if (mounted) {
+          setState(() {
+            _isGameInitialized = true; // Все равно разрешаем подключение
+            _connectionStatus = 'Game ready (limited)';
+          });
+        }
       }
     } catch (e, stackTrace) {
       debugPrint('❌ Game initialization error: $e');
       debugPrint('Stack trace: $stackTrace');
-      setState(() {
-        _connectionStatus = 'Game init failed: $e';
-      });
+      if (mounted) {
+        setState(() {
+          _isGameInitialized = true; // Разрешаем подключение даже при ошибке
+          _connectionStatus = 'Game ready (some features limited)';
+        });
+      }
     }
   }
 
@@ -214,29 +226,32 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
       final uri = Uri.parse(serverUrl);
       final httpUrl = 'http://${uri.host}:${uri.port}';
 
-      debugPrint('🔍 Testing connection to: $httpUrl');
+      debugPrint('🔍 Loading rooms from: $httpUrl/rooms');
 
       final response = await http.get(Uri.parse('$httpUrl/rooms'));
       if (response.statusCode == 200) {
-        debugPrint('✅ Server connected successfully!');
+        debugPrint('✅ Rooms loaded successfully!');
         final List<dynamic> data = jsonDecode(response.body);
         setState(() {
           _availableRooms = data
               .map((json) => RoomInfo.fromJson(json))
               .toList();
         });
-        _connectionStatus = 'Connected to server';
+        _connectionStatus =
+            'Connected to server (${_availableRooms.length} rooms)';
+
+        // Логируем событие
+        _eventLogger.addEvent(
+          'rooms_loaded',
+          message: 'Found ${_availableRooms.length} rooms',
+        );
       } else {
         debugPrint('❌ Server responded with status: ${response.statusCode}');
         _connectionStatus = 'Server error: ${response.statusCode}';
       }
     } catch (e) {
-      debugPrint('❌ Connection failed: $e');
-      String errorMsg = e.toString();
-      if (errorMsg.length > 50) {
-        errorMsg = errorMsg.substring(0, 50) + '...';
-      }
-      _connectionStatus = 'Failed: $errorMsg';
+      debugPrint('❌ Failed to load rooms: $e');
+      _connectionStatus = 'Cannot connect to server';
     } finally {
       if (mounted) {
         setState(() {
@@ -265,10 +280,15 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
         debugPrint('✅ Ping successful: $data');
 
         setState(() {
-          _connectionStatus =
-              '✅ Server OK! Uptime: ${data['uptime']?.toStringAsFixed(1) ?? 0}s';
+          _connectionStatus = '✅ Server OK! Games: ${data['games'] ?? 0}';
         });
         _showSnackBar('✅ Server is running!');
+
+        _eventLogger.addEvent(
+          'connection_test',
+          message: 'Server ping successful',
+          data: data,
+        );
 
         // Также загрузим комнаты
         await _loadRooms();
@@ -281,136 +301,89 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
       }
     } catch (e) {
       debugPrint('❌ Test connection error: $e');
-      String errorMsg = e.toString();
-      if (errorMsg.length > 40) {
-        errorMsg = errorMsg.substring(0, 40) + '...';
-      }
       setState(() {
-        _connectionStatus = '❌ Error: $errorMsg';
+        _connectionStatus = '❌ Cannot connect to server';
       });
-      _showSnackBar('❌ Cannot connect to server');
+      _showSnackBar('❌ Cannot connect to server: $e');
     }
   }
 
-  Future<void> _connectToGame() async {
-    // Проверяем, что игра инициализирована
-    if (!_isGameInitialized) {
-      _showSnackBar('Game is still initializing, please wait...');
-      return;
-    }
-
+  Future<void> _connectToRoom(
+    String serverUrl,
+    String playerName,
+    String roomId,
+  ) async {
     _eventLogger.addEvent(
       'connect_attempt',
-      message: 'Attempting to connect...',
-      roomId: _roomIdController.text.trim(),
+      message: 'Connecting to room: $roomId',
+      roomId: roomId,
     );
 
-    if (_playerNameController.text.trim().isEmpty) {
-      _showSnackBar('Please enter your name');
-      return;
-    }
-
-    if (_roomIdController.text.trim().isEmpty && _selectedRoomId == null) {
-      _showSnackBar('Please enter room ID or select a room');
-      return;
-    }
-
     setState(() {
+      _connectionStatus = 'Connecting to room...';
       _isConnecting = true;
-      _connectionStatus = 'Connecting...';
     });
 
-    final roomId = _selectedRoomId ?? _roomIdController.text.trim();
-    final serverUrl = _serverUrlController.text;
-    final playerName = _playerNameController.text.trim();
-
-    debugPrint('🎮 Attempting to connect...');
+    debugPrint('🎮 Connecting to room...');
     debugPrint('  Server: $serverUrl');
     debugPrint('  Player: $playerName');
     debugPrint('  Room: $roomId');
 
     try {
-      _eventLogger.addEvent(
-        'connecting',
-        message: 'Checking server ping...',
-        roomId: roomId,
-      );
-
-      // Проверяем соединение с сервером
+      // Проверяем сервер
       final uri = Uri.parse(serverUrl);
       final httpUrl = 'http://${uri.host}:${uri.port}';
 
-      debugPrint('🔍 Checking server ping...');
+      debugPrint('🔍 Checking server...');
       final pingResponse = await http.get(Uri.parse('$httpUrl/ping'));
 
       if (pingResponse.statusCode != 200) {
-        debugPrint('❌ Server ping failed: ${pingResponse.statusCode}');
-        _eventLogger.addEvent(
-          'error',
-          message: 'Server ping failed: ${pingResponse.statusCode}',
-          roomId: roomId,
-        );
         throw Exception('Server not responding (${pingResponse.statusCode})');
       }
 
-      debugPrint('✅ Server ping OK');
-      _eventLogger.addEvent(
-        'server_ok',
-        message: 'Server ping successful',
-        roomId: roomId,
-      );
+      debugPrint('✅ Server OK');
 
-      // Проверяем gameWorld
-      if (game.gameWorld == null) {
-        debugPrint('⚠️ GameWorld is null, creating...');
-        game.gameWorld = GameWorld(
-          resourceManager: game.resourceManager,
-          inputManager: game.inputManager,
-        );
-        debugPrint('✅ GameWorld created');
-      }
-
-      // Проверяем NetworkManager
-      if (game.gameWorld!.networkManager == null) {
-        debugPrint('⚠️ NetworkManager is null, waiting for initialization...');
-
-        // Ждем инициализации NetworkManager
+      // Ждем networkManager если ещё не готов
+      if (game.gameWorld?.networkManager == null) {
+        debugPrint('⚠️ NetworkManager is null, waiting...');
         int attempts = 0;
-        while (game.gameWorld!.networkManager == null && attempts < 30) {
+        while (game.gameWorld?.networkManager == null && attempts < 30) {
           await Future.delayed(const Duration(milliseconds: 100));
           attempts++;
         }
-
-        if (game.gameWorld!.networkManager == null) {
+        if (game.gameWorld?.networkManager == null) {
           throw Exception('NetworkManager initialization timeout');
         }
       }
 
-      debugPrint('✅ NetworkManager is ready!');
+      debugPrint('✅ NetworkManager ready!');
 
-      // Подключаемся к игре
-      debugPrint('🔗 Connecting to game...');
-      _eventLogger.addEvent(
-        'connecting_game',
-        message: 'Connecting to game server...',
-        roomId: roomId,
-      );
+      // Настраиваем связь логгера с клиентом
+      final networkManager = game.gameWorld!.networkManager!;
+      _eventLogger.onSendEventToServer = (eventData) {
+        networkManager.client.sendEventToServer(
+          type: eventData['type'] as String,
+          roomId: eventData['roomId'] as String?,
+          playerId: eventData['playerId'] as String?,
+          message: eventData['message'] as String?,
+          data: eventData['data'],
+        );
+      };
 
+      // Подключаемся
       await game.connectToGame(serverUrl, playerName, roomId);
       debugPrint('✅ Game connected successfully');
 
       _eventLogger.addEvent(
         'connected',
-        message: 'Successfully connected to game!',
+        message: 'Successfully connected to room: $roomId',
         roomId: roomId,
       );
 
-      // Ждём подтверждения подключения
       await Future.delayed(const Duration(seconds: 1));
 
       if (mounted) {
         debugPrint('🚀 Navigating to game screen...');
-        // Переходим в игру
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const GameScreen()),
@@ -426,37 +399,127 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
         roomId: roomId,
       );
 
-      // Безопасная обрезка строки ошибки
-      String errorMsg = e.toString();
-      if (errorMsg.length > 60) {
-        errorMsg = errorMsg.substring(0, 60) + '...';
-      }
-
       if (mounted) {
         setState(() {
-          _connectionStatus = 'Connection failed: $errorMsg';
+          _connectionStatus = 'Connection failed';
           _isConnecting = false;
         });
-        _showSnackBar('Connection failed: $errorMsg');
+        _showSnackBar('Connection failed: $e');
       }
     }
   }
 
-  void _createNewRoom() async {
+  Future<void> _connectToSelectedRoom() async {
     if (_playerNameController.text.trim().isEmpty) {
-      _showSnackBar('Please enter your name first');
+      _showSnackBar('Please enter your name');
       return;
     }
 
-    // Генерируем уникальный ID комнаты
-    final newRoomId = 'room_${DateTime.now().millisecondsSinceEpoch}';
-    _roomIdController.text = newRoomId;
-    _selectedRoomId = newRoomId;
+    if (_selectedRoomId == null && _roomIdController.text.trim().isEmpty) {
+      _showSnackBar('Please select or enter a room ID');
+      return;
+    }
 
-    // Создаём комнату через API
+    final roomId = _selectedRoomId ?? _roomIdController.text.trim();
+    final serverUrl = _serverUrlController.text;
+    final playerName = _playerNameController.text.trim();
+
+    setState(() {
+      _isConnecting = true;
+    });
+
+    await _connectToRoom(serverUrl, playerName, roomId);
+  }
+
+  Future<void> _startGameInRoom() async {
+    if (_selectedRoomId == null && _roomIdController.text.trim().isEmpty) {
+      _showSnackBar('Please select or enter a room ID first');
+      return;
+    }
+
+    final roomId = _selectedRoomId ?? _roomIdController.text.trim();
+    final uri = Uri.parse(_serverUrlController.text);
+    final httpUrl = 'http://${uri.host}:${uri.port}';
+
     try {
-      final uri = Uri.parse(_serverUrlController.text);
+      debugPrint('🎮 Starting game in room: $roomId');
+
+      final response = await http.post(
+        Uri.parse('$httpUrl/api/admin/room/$roomId/start'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        _showSnackBar('✅ Game started!');
+        debugPrint('✅ Game start command sent');
+      } else {
+        _showSnackBar('Failed to start game: ${response.statusCode}');
+        debugPrint('❌ Failed to start game: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('❌ Start game error: $e');
+      _showSnackBar('Error starting game: $e');
+    }
+  }
+
+  Future<void> _sendTestMessage() async {
+    if (_selectedRoomId == null && _roomIdController.text.trim().isEmpty) {
+      _showSnackBar('Please select or enter a room ID first');
+      return;
+    }
+
+    final roomId = _selectedRoomId ?? _roomIdController.text.trim();
+    final uri = Uri.parse(_serverUrlController.text);
+    final httpUrl = 'http://${uri.host}:${uri.port}';
+
+    try {
+      debugPrint('📨 Sending test message to room: $roomId');
+
+      final response = await http.post(
+        Uri.parse('$httpUrl/api/admin/room/$roomId/message'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'message': 'Test message from Flutter client',
+          'sender': _playerNameController.text.trim(),
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        _showSnackBar('✅ Test message sent!');
+        debugPrint('✅ Test message sent');
+      } else {
+        _showSnackBar('Failed to send message: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('❌ Send message error: $e');
+      _showSnackBar('Error sending message: $e');
+    }
+  }
+
+  Future<void> _createAndConnectToRoom() async {
+    if (_playerNameController.text.trim().isEmpty) {
+      _showSnackBar('Please enter your name');
+      return;
+    }
+
+    setState(() {
+      _isConnecting = true;
+      _connectionStatus = 'Creating room...';
+    });
+
+    final newRoomId = 'room_${DateTime.now().millisecondsSinceEpoch}';
+    final serverUrl = _serverUrlController.text;
+    final playerName = _playerNameController.text.trim();
+
+    try {
+      final uri = Uri.parse(serverUrl);
       final httpUrl = 'http://${uri.host}:${uri.port}';
+
+      debugPrint('🏠 Creating room: $newRoomId');
+      _eventLogger.addEvent(
+        'creating_room',
+        message: 'Creating room: $newRoomId',
+      );
 
       final response = await http.post(
         Uri.parse('$httpUrl/api/admin/room/create'),
@@ -465,18 +528,28 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
       );
 
       if (response.statusCode == 200) {
-        debugPrint('✅ Room created: $newRoomId');
-        _showSnackBar('Created new room: $newRoomId');
+        debugPrint('✅ Room created successfully: $newRoomId');
+        _showSnackBar('✅ Room created: $newRoomId');
+
+        // Подключаемся к созданной комнате
+        await _connectToRoom(serverUrl, playerName, newRoomId);
       } else {
-        debugPrint('❌ Failed to create room: ${response.statusCode}');
-        _showSnackBar('Room may already exist or server error');
+        final error = jsonDecode(response.body)['error'] ?? 'Unknown error';
+        debugPrint('❌ Failed to create room: $error');
+        _showSnackBar('Failed to create room: $error');
+        setState(() {
+          _isConnecting = false;
+          _connectionStatus = 'Failed to create room';
+        });
       }
     } catch (e) {
-      debugPrint('Create room API error: $e');
-      _showSnackBar('Created room ID: $newRoomId (may need manual creation)');
+      debugPrint('❌ Create room error: $e');
+      _showSnackBar('Error creating room: $e');
+      setState(() {
+        _isConnecting = false;
+        _connectionStatus = 'Create room failed: $e';
+      });
     }
-
-    await _loadRooms();
   }
 
   void _showSnackBar(String message) {
@@ -640,6 +713,33 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
         ),
         const SizedBox(height: 24),
 
+        // Кнопка создания комнаты и подключения
+        ElevatedButton(
+          onPressed: _isConnecting ? null : _createAndConnectToRoom,
+          style: ElevatedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            backgroundColor: Colors.green,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+          child: _isConnecting
+              ? const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Text(
+                  '🎮 CREATE & JOIN NEW ROOM',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+        ),
+
+        const SizedBox(height: 16),
+
         // Разделитель
         Row(
           children: [
@@ -647,7 +747,7 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Text(
-                'OR SELECT ROOM',
+                'OR JOIN EXISTING ROOM',
                 style: TextStyle(color: Colors.grey[500], fontSize: 12),
               ),
             ),
@@ -658,7 +758,7 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
 
         // Список комнат
         Container(
-          constraints: const BoxConstraints(maxHeight: 300),
+          constraints: const BoxConstraints(maxHeight: 250),
           decoration: BoxDecoration(
             border: Border.all(color: Colors.grey[700]!),
             borderRadius: BorderRadius.circular(8),
@@ -753,57 +853,11 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
             }
           },
         ),
-        const SizedBox(height: 24),
-
-        // Кнопки
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: _isConnecting ? null : _testConnection,
-                icon: const Icon(Icons.bug_report),
-                label: const Text('Test'),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  side: BorderSide(color: Colors.orange[700]!),
-                  foregroundColor: Colors.orange,
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: _isConnecting ? null : _loadRooms,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Refresh'),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  side: BorderSide(color: Colors.grey[600]!),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: _isConnecting ? null : _createNewRoom,
-                icon: const Icon(Icons.add),
-                label: const Text('Create'),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  side: BorderSide(color: Colors.green[700]!),
-                  foregroundColor: Colors.green,
-                ),
-              ),
-            ),
-          ],
-        ),
         const SizedBox(height: 16),
 
-        // Кнопка Connect (главная)
+        // Кнопка подключения к выбранной комнате
         ElevatedButton(
-          onPressed: (_isConnecting || !_isGameInitialized)
-              ? null
-              : _connectToGame,
+          onPressed: _isConnecting ? null : _connectToSelectedRoom,
           style: ElevatedButton.styleFrom(
             padding: const EdgeInsets.symmetric(vertical: 16),
             backgroundColor: Colors.blueAccent,
@@ -821,10 +875,76 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
                   ),
                 )
               : const Text(
-                  'CONNECT',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  '🔌 JOIN SELECTED ROOM',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
         ),
+
+        const SizedBox(height: 16),
+
+        // Строка дополнительных кнопок
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _isConnecting ? null : _testConnection,
+                icon: const Icon(Icons.bug_report),
+                label: const Text('Test'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  side: BorderSide(color: Colors.orange[700]!),
+                  foregroundColor: Colors.orange,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _isConnecting ? null : _loadRooms,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Refresh'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  side: BorderSide(color: Colors.grey[600]!),
+                ),
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 12),
+
+        // Кнопки управления комнатой (только если выбрана комната)
+        if (_selectedRoomId != null || _roomIdController.text.isNotEmpty)
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _startGameInRoom,
+                  icon: const Icon(Icons.play_arrow),
+                  label: const Text('Start Game'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    side: BorderSide(color: Colors.green[700]!),
+                    foregroundColor: Colors.green,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _sendTestMessage,
+                  icon: const Icon(Icons.send),
+                  label: const Text('Test Msg'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    side: BorderSide(color: Colors.blue[700]!),
+                    foregroundColor: Colors.blue,
+                  ),
+                ),
+              ),
+            ],
+          ),
 
         const SizedBox(height: 24),
 
@@ -853,7 +973,7 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
                 style: TextStyle(color: Colors.grey[600], fontSize: 11),
               ),
               Text(
-                'Make sure the server is running',
+                'Use "Create & Join" to start a new game',
                 style: TextStyle(color: Colors.grey[600], fontSize: 11),
               ),
             ],
@@ -984,7 +1104,12 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
                                 ],
                               ),
                             ),
-                            Expanded(child: EventsPanel(logger: _eventLogger)),
+                            Expanded(
+                              child: EventsPanel(
+                                logger: _eventLogger,
+                                roomFilter: null,
+                              ),
+                            ),
                           ],
                         ),
                       ),

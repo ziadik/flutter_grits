@@ -618,6 +618,33 @@ app.post("/api/admin/room/:roomId/end", (req, res) => {
   res.json({ success: true });
 });
 
+app.post("/api/admin/room/:roomId/start", (req, res) => {
+  const room = rooms.get(req.params.roomId);
+  if (!room) return res.status(404).json({ success: false, error: "Room not found" });
+  
+  if (room.state === "waiting") {
+    room.startGame();
+    res.json({ success: true, message: "Game started" });
+  } else {
+    res.json({ success: false, message: "Game already in progress" });
+  }
+});
+
+app.post("/api/admin/room/:roomId/message", (req, res) => {
+  const room = rooms.get(req.params.roomId);
+  if (!room) return res.status(404).json({ success: false, error: "Room not found" });
+  
+  const { message, sender } = req.body;
+  room.broadcast({
+    type: "admin_message",
+    sender: sender || "Admin",
+    message: message || "Test message",
+    timestamp: Date.now()
+  });
+  
+  res.json({ success: true, message: "Message sent" });
+});
+
 app.get("/api/events", (req, res) => {
   const limit = parseInt(req.query.limit) || 100;
   res.json({ success: true, events: eventStore.getEvents(limit) });
