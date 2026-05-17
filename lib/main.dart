@@ -24,11 +24,16 @@ void main() async {
 
   // Загружаем ресурсы с обработкой ошибок
   final resourceManager = ResourceManager();
+
+  // Сначала создаем игру без gameWorld
   game = GritsGame(resourceManager: resourceManager);
 
   try {
     await resourceManager.loadResources();
     debugPrint('✅ Resources loaded successfully');
+
+    // После загрузки ресурсов инициализируем gameWorld
+    // Но не вызываем game.onLoad() здесь, так как это может вызвать проблемы с контекстом
   } catch (e) {
     debugPrint('❌ Error loading resources: $e');
     if (kDebugMode) {
@@ -120,16 +125,71 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
   final EventsLogger _eventLogger = EventsLogger();
   bool _showEventsPanel = false;
 
+  // Флаг готовности игры
+  bool _isGameInitialized = false;
+
   @override
   void initState() {
     super.initState();
     _playerNameController.text = 'Player${Random().nextInt(1000)}';
     _loadRooms();
 
+    // Инициализируем игру сразу после загрузки экрана
+    _initializeGame();
+
     // Автообновление списка комнат каждые 5 секунд
     Future.delayed(Duration.zero, () {
       _startAutoRefresh();
     });
+  }
+
+  Future<void> _initializeGame() async {
+    try {
+      debugPrint('🎮 Initializing game...');
+
+      // Убеждаемся, что gameWorld создан
+      if (game.gameWorld == null) {
+        debugPrint('  Creating GameWorld...');
+        game.gameWorld = GameWorld(
+          resourceManager: game.resourceManager,
+          inputManager: game
+              .inputManager, // Теперь inputManager уже должен быть инициализирован
+        );
+        debugPrint('  ✅ GameWorld created');
+      }
+
+      // Вызываем onLoad для инициализации игры
+      debugPrint('  Calling game.onLoad()...');
+      await game.onLoad();
+      debugPrint('  ✅ Game.onLoad() completed');
+
+      // Ждем инициализации NetworkManager
+      debugPrint('  Waiting for NetworkManager initialization...');
+      int attempts = 0;
+      while (game.gameWorld?.networkManager == null && attempts < 30) {
+        await Future.delayed(const Duration(milliseconds: 100));
+        attempts++;
+      }
+
+      if (game.gameWorld?.networkManager != null) {
+        debugPrint('  ✅ NetworkManager initialized');
+        setState(() {
+          _isGameInitialized = true;
+          _connectionStatus = 'Game ready';
+        });
+      } else {
+        debugPrint('  ⚠️ NetworkManager not initialized yet');
+        setState(() {
+          _connectionStatus = 'Game initializing...';
+        });
+      }
+    } catch (e, stackTrace) {
+      debugPrint('❌ Game initialization error: $e');
+      debugPrint('Stack trace: $stackTrace');
+      setState(() {
+        _connectionStatus = 'Game init failed: $e';
+      });
+    }
   }
 
   void _startAutoRefresh() {
@@ -233,6 +293,12 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
   }
 
   Future<void> _connectToGame() async {
+    // Проверяем, что игра инициализирована
+    if (!_isGameInitialized) {
+      _showSnackBar('Game is still initializing, please wait...');
+      return;
+    }
+
     _eventLogger.addEvent(
       'connect_attempt',
       message: 'Attempting to connect...',
@@ -294,12 +360,9 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
         roomId: roomId,
       );
 
-      // Проверяем и загружаем gameWorld если нужно
-      debugPrint('🎮 Checking game initialization...');
-
-      // Сначала убеждаемся, что gameWorld создана
+      // Проверяем gameWorld
       if (game.gameWorld == null) {
-        debugPrint('⏳ GameWorld not created yet, creating...');
+        debugPrint('⚠️ GameWorld is null, creating...');
         game.gameWorld = GameWorld(
           resourceManager: game.resourceManager,
           inputManager: game.inputManager,
@@ -307,30 +370,32 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
         debugPrint('✅ GameWorld created');
       }
 
-      // Ждем пока networkManager инициализируется (макс 3 секунды)
-      debugPrint('⏳ Waiting for NetworkManager...');
-      int attempts = 0;
-      while (game.gameWorld!.networkManager == null && attempts < 30) {
-        await Future.delayed(const Duration(milliseconds: 100));
-        attempts++;
-      }
-
+      // Проверяем NetworkManager
       if (game.gameWorld!.networkManager == null) {
-        debugPrint('❌ NetworkManager still null after ${attempts * 100}ms');
-        throw Exception(
-          'NetworkManager not initialized after ${attempts * 100}ms',
-        );
+        debugPrint('⚠️ NetworkManager is null, waiting for initialization...');
+
+        // Ждем инициализации NetworkManager
+        int attempts = 0;
+        while (game.gameWorld!.networkManager == null && attempts < 30) {
+          await Future.delayed(const Duration(milliseconds: 100));
+          attempts++;
+        }
+
+        if (game.gameWorld!.networkManager == null) {
+          throw Exception('NetworkManager initialization timeout');
+        }
       }
 
       debugPrint('✅ NetworkManager is ready!');
 
-      // Подключаемся к игре (используем глобальный game)
+      // Подключаемся к игре
       debugPrint('🔗 Connecting to game...');
       _eventLogger.addEvent(
         'connecting_game',
         message: 'Connecting to game server...',
         roomId: roomId,
       );
+
       await game.connectToGame(serverUrl, playerName, roomId);
       debugPrint('✅ Game connected successfully');
 
@@ -348,7 +413,7 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
         // Переходим в игру
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => GameScreen()),
+          MaterialPageRoute(builder: (_) => const GameScreen()),
         );
       }
     } catch (e, stackTrace) {
@@ -388,21 +453,29 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
     _roomIdController.text = newRoomId;
     _selectedRoomId = newRoomId;
 
-    // Создаём комнату через API (опционально)
+    // Создаём комнату через API
     try {
       final uri = Uri.parse(_serverUrlController.text);
       final httpUrl = 'http://${uri.host}:${uri.port}';
 
-      await http.post(
-        Uri.parse('$httpUrl/create-room'),
+      final response = await http.post(
+        Uri.parse('$httpUrl/api/admin/room/create'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'roomId': newRoomId, 'maxPlayers': 4}),
       );
+
+      if (response.statusCode == 200) {
+        debugPrint('✅ Room created: $newRoomId');
+        _showSnackBar('Created new room: $newRoomId');
+      } else {
+        debugPrint('❌ Failed to create room: ${response.statusCode}');
+        _showSnackBar('Room may already exist or server error');
+      }
     } catch (e) {
       debugPrint('Create room API error: $e');
+      _showSnackBar('Created room ID: $newRoomId (may need manual creation)');
     }
 
-    _showSnackBar('Created new room: $newRoomId');
     await _loadRooms();
   }
 
@@ -488,12 +561,15 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
           child: Row(
             children: [
               Icon(
-                _connectionStatus.contains('Connected')
+                _connectionStatus.contains('Connected') ||
+                        _connectionStatus.contains('ready')
                     ? Icons.check_circle
                     : _connectionStatus.contains('failed')
                     ? Icons.error
                     : Icons.wifi,
-                color: _connectionStatus.contains('Connected')
+                color:
+                    _connectionStatus.contains('Connected') ||
+                        _connectionStatus.contains('ready')
                     ? Colors.green
                     : _connectionStatus.contains('failed')
                     ? Colors.red
@@ -725,7 +801,9 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
 
         // Кнопка Connect (главная)
         ElevatedButton(
-          onPressed: _isConnecting ? null : _connectToGame,
+          onPressed: (_isConnecting || !_isGameInitialized)
+              ? null
+              : _connectToGame,
           style: ElevatedButton.styleFrom(
             padding: const EdgeInsets.symmetric(vertical: 16),
             backgroundColor: Colors.blueAccent,

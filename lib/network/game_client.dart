@@ -72,6 +72,19 @@ class GameClient {
   final EventsLogger _eventLogger = EventsLogger();
   EventsLogger get eventLogger => _eventLogger;
 
+  GameClient() {
+    // Настраиваем колбэк для отправки событий на сервер
+    _eventLogger.onSendEventToServer = (eventData) {
+      sendEventToServer(
+        type: eventData['type'] as String,
+        roomId: eventData['roomId'] as String?,
+        playerId: eventData['playerId'] as String?,
+        message: eventData['message'] as String?,
+        data: eventData['data'],
+      );
+    };
+  }
+
   // Колбэки для обновления игрового мира
   Function(List<NetworkPlayer> players)? onPlayersUpdate;
   Function(String playerId, double x, double y, double angle, int weaponSlot)?
@@ -86,8 +99,6 @@ class GameClient {
   Function(String reason)? onGameEnd;
   Function(String error)? onError;
   Function(ConnectionState state)? onConnectionStateChange;
-
-  GameClient();
 
   // Геттеры
   ConnectionState get connectionState => _connectionState;
@@ -281,6 +292,37 @@ class GameClient {
       _channel!.sink.add(jsonEncode(data));
     } catch (e) {
       debugPrint('Error sending message: $e');
+    }
+  }
+
+  /// Отправка события на сервер для логирования
+  void sendEventToServer({
+    required String type,
+    String? roomId,
+    String? playerId,
+    String? message,
+    dynamic data,
+  }) {
+    if (_channel == null || _connectionState != ConnectionState.connected) {
+      return;
+    }
+
+    try {
+      _channel!.sink.add(
+        jsonEncode({
+          'type': 'client_event',
+          'event': {
+            'type': type,
+            'roomId': roomId,
+            'playerId': playerId,
+            'message': message,
+            'data': data,
+            'timestamp': DateTime.now().toIso8601String(),
+          },
+        }),
+      );
+    } catch (e) {
+      debugPrint('Error sending event to server: $e');
     }
   }
 

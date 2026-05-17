@@ -54,6 +54,9 @@ class EventsLogger extends ChangeNotifier {
 
   final List<GameEvent> _events = [];
 
+  // Ссылка на GameClient для отправки событий на сервер
+  Function(Map<String, dynamic>)? onSendEventToServer;
+
   List<GameEvent> get events => List.unmodifiable(_events);
 
   void addEvent(
@@ -81,6 +84,18 @@ class EventsLogger extends ChangeNotifier {
 
     // Логируем в консоль
     debugPrint('📡 EVENT: $type ${message != null ? '- $message' : ''}');
+
+    // Отправляем событие на сервер если есть колбэк
+    if (onSendEventToServer != null) {
+      onSendEventToServer!({
+        'type': type,
+        'roomId': roomId,
+        'playerId': playerId,
+        'message': message,
+        'data': data,
+        'timestamp': DateTime.now().toIso8601String(),
+      });
+    }
   }
 
   void clearEvents() {

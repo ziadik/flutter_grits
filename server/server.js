@@ -515,6 +515,21 @@ wss.on("connection", (ws, req) => {
           }
         }
         break;
+      case "client_event":
+        // Обработка событий от клиента для логирования
+        if (msg.event) {
+          eventStore.addEvent({
+            type: msg.event.type || 'client_message',
+            roomId: msg.event.roomId,
+            playerId: msg.event.playerId,
+            playerName: player?.name,
+            message: msg.event.message,
+            data: msg.event.data,
+            severity: msg.event.type?.includes('error') ? 'critical' : 'info'
+          });
+          logger.info(`📡 Client event: ${msg.event.type} - ${msg.event.message || ''}`);
+        }
+        break;
       case "shoot":
         if (currentRoom && currentPlayerId) {
           const room = rooms.get(currentRoom);
