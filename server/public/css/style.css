@@ -1,0 +1,25 @@
+/* Grits Game - общие стили */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0a0c15; color: #eef2ff; }
+.container { max-width: 1600px; margin: 0 auto; padding: 20px; }
+.header { text-align: center; margin-bottom: 30px; }
+.header h1 { font-size: 2.2rem; background: linear-gradient(135deg, #a5f0ff, #7c4dff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.card { background: #121826; border-radius: 20px; padding: 20px; border: 1px solid #2a2f3f; }
+.card h2 { font-size: 1.4rem; border-left: 4px solid #7c4dff; padding-left: 12px; margin-bottom: 18px; }
+input, select, button { background: #1e2436; border: 1px solid #2f3548; color: #fff; padding: 10px 14px; border-radius: 12px; font-size: 14px; outline: none; }
+button { background: #2a2f42; cursor: pointer; font-weight: bold; }
+button.primary { background: #7c4dff; }
+button.danger { background: #c42e2e; }
+.status-badge { display: inline-block; padding: 6px 12px; border-radius: 40px; font-size: 0.75rem; font-weight: bold; }
+.status-online { background: #1f5e3a; color: #a3f0c0; }
+.status-offline { background: #5e2a2a; color: #ffaeae; }
+.flex-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+.flex-between { display: flex; justify-content: space-between; align-items: center; }
+.dashboard { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+@media (max-width: 1000px) { .dashboard { grid-template-columns: 1fr; } }
+.log-area { background: #0b0e16; border-radius: 16px; padding: 12px; height: 400px; overflow-y: auto; font-family: monospace; font-size: 12px; }
+.log-entry { border-bottom: 1px solid #1e2332; padding: 6px 8px; }
+.log-time { color: #5f7f9e; margin-right: 12px; }
+.log-info { color: #a2d9ff; }
+.log-error { color: #ff8a8a; }
+.log-success { color: #8affc1; }

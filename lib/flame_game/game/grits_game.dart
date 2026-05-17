@@ -64,21 +64,11 @@ class GritsGame extends FlameGame
     debugPrint(
       '  gameWorld.networkManager is null: ${gameWorld!.networkManager == null}',
     );
-    debugPrint('🔗 GritsGame.connectToGame called, checking networkManager...');
 
-    // Ждём пока networkManager инициализируется (в onMount после onLoad)
-    int attempts = 0;
-    while (gameWorld!.networkManager == null && attempts < 30) {
-      debugPrint('  Waiting for networkManager... attempt $attempts');
-      await Future.delayed(const Duration(milliseconds: 100));
-      attempts++;
-    }
-
+    // NetworkManager создается синхронно в GameWorld.onLoad(), поэтому не нужно ждать
     if (gameWorld!.networkManager == null) {
-      debugPrint('❌ networkManager still null after ${attempts * 100}ms');
-      throw Exception(
-        'NetworkManager not initialized after ${attempts * 100}ms',
-      );
+      debugPrint('❌ networkManager is null after GameWorld onLoad');
+      throw Exception('NetworkManager not initialized');
     }
 
     debugPrint('✅ NetworkManager is ready!');

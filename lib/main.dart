@@ -1,13 +1,16 @@
 import 'dart:math';
+import 'dart:convert';
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_grits/flame_game/game/grits_game.dart';
+import 'package:flutter_grits/flame_game/game/world/game_world.dart';
 import 'package:flutter_grits/flame_game/managers/resource_manager.dart';
 import 'package:flutter_grits/flame_game/managers/sound_manager.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_grits/ui/events_logger.dart';
+import 'package:flutter_grits/ui/events_panel.dart';
 
 import 'package:http/http.dart' as http;
-import 'dart:convert';
 
 /// Глобальный ключ для доступа к Navigator из Flame кода
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -112,6 +115,10 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
   List<RoomInfo> _availableRooms = [];
   bool _isLoadingRooms = false;
   String? _selectedRoomId;
+
+  // Логгер событий
+  final EventsLogger _eventLogger = EventsLogger();
+  bool _showEventsPanel = false;
 
   @override
   void initState() {
@@ -226,6 +233,12 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
   }
 
   Future<void> _connectToGame() async {
+    _eventLogger.addEvent(
+      'connect_attempt',
+      message: 'Attempting to connect...',
+      roomId: _roomIdController.text.trim(),
+    );
+
     if (_playerNameController.text.trim().isEmpty) {
       _showSnackBar('Please enter your name');
       return;
@@ -251,6 +264,12 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
     debugPrint('  Room: $roomId');
 
     try {
+      _eventLogger.addEvent(
+        'connecting',
+        message: 'Checking server ping...',
+        roomId: roomId,
+      );
+
       // Проверяем соединение с сервером
       final uri = Uri.parse(serverUrl);
       final httpUrl = 'http://${uri.host}:${uri.port}';
@@ -260,25 +279,66 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
 
       if (pingResponse.statusCode != 200) {
         debugPrint('❌ Server ping failed: ${pingResponse.statusCode}');
+        _eventLogger.addEvent(
+          'error',
+          message: 'Server ping failed: ${pingResponse.statusCode}',
+          roomId: roomId,
+        );
         throw Exception('Server not responding (${pingResponse.statusCode})');
       }
 
       debugPrint('✅ Server ping OK');
+      _eventLogger.addEvent(
+        'server_ok',
+        message: 'Server ping successful',
+        roomId: roomId,
+      );
 
       // Проверяем и загружаем gameWorld если нужно
       debugPrint('🎮 Checking game initialization...');
+
+      // Сначала убеждаемся, что gameWorld создана
       if (game.gameWorld == null) {
-        debugPrint('⏳ GameWorld not loaded yet, loading...');
-        await game.onLoad();
-        debugPrint('✅ GameWorld loaded successfully');
-      } else {
-        debugPrint('✅ GameWorld already loaded');
+        debugPrint('⏳ GameWorld not created yet, creating...');
+        game.gameWorld = GameWorld(
+          resourceManager: game.resourceManager,
+          inputManager: game.inputManager,
+        );
+        debugPrint('✅ GameWorld created');
       }
+
+      // Ждем пока networkManager инициализируется (макс 3 секунды)
+      debugPrint('⏳ Waiting for NetworkManager...');
+      int attempts = 0;
+      while (game.gameWorld!.networkManager == null && attempts < 30) {
+        await Future.delayed(const Duration(milliseconds: 100));
+        attempts++;
+      }
+
+      if (game.gameWorld!.networkManager == null) {
+        debugPrint('❌ NetworkManager still null after ${attempts * 100}ms');
+        throw Exception(
+          'NetworkManager not initialized after ${attempts * 100}ms',
+        );
+      }
+
+      debugPrint('✅ NetworkManager is ready!');
 
       // Подключаемся к игре (используем глобальный game)
       debugPrint('🔗 Connecting to game...');
+      _eventLogger.addEvent(
+        'connecting_game',
+        message: 'Connecting to game server...',
+        roomId: roomId,
+      );
       await game.connectToGame(serverUrl, playerName, roomId);
       debugPrint('✅ Game connected successfully');
+
+      _eventLogger.addEvent(
+        'connected',
+        message: 'Successfully connected to game!',
+        roomId: roomId,
+      );
 
       // Ждём подтверждения подключения
       await Future.delayed(const Duration(seconds: 1));
@@ -294,6 +354,12 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
     } catch (e, stackTrace) {
       debugPrint('❌ Connection error: $e');
       debugPrint('Stack trace: $stackTrace');
+
+      _eventLogger.addEvent(
+        'error',
+        message: 'Connection error: $e',
+        roomId: roomId,
+      );
 
       // Безопасная обрезка строки ошибки
       String errorMsg = e.toString();
@@ -346,12 +412,377 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
     );
   }
 
+  void _exportEvents() {
+    // Экспорт событий в JSON
+    final eventsJson = _eventLogger.events
+        .map(
+          (e) => {
+            'type': e.type,
+            'timestamp': e.timestamp.toIso8601String(),
+            'roomId': e.roomId,
+            'playerId': e.playerId,
+            'message': e.message,
+          },
+        )
+        .toList();
+
+    // Показать или сохранить
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Export Events'),
+        content: Text('${eventsJson.length} events exported to console'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+
+    debugPrint('📊 EXPORTED EVENTS: ${jsonEncode(eventsJson)}');
+  }
+
   @override
   void dispose() {
     _serverUrlController.dispose();
     _playerNameController.dispose();
     _roomIdController.dispose();
     super.dispose();
+  }
+
+  Widget _buildConnectionForm() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Заголовок
+        const Icon(Icons.games, size: 80, color: Colors.blueAccent),
+        const SizedBox(height: 16),
+        const Text(
+          'GRITS GAME',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 32,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+            letterSpacing: 4,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Multiplayer Arena Shooter',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 14, color: Colors.grey[400]),
+        ),
+        const SizedBox(height: 48),
+
+        // Статус подключения
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: Colors.grey[800],
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                _connectionStatus.contains('Connected')
+                    ? Icons.check_circle
+                    : _connectionStatus.contains('failed')
+                    ? Icons.error
+                    : Icons.wifi,
+                color: _connectionStatus.contains('Connected')
+                    ? Colors.green
+                    : _connectionStatus.contains('failed')
+                    ? Colors.red
+                    : Colors.yellow,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  _connectionStatus,
+                  style: TextStyle(color: Colors.grey[300], fontSize: 12),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
+
+        // Поле Server URL
+        TextField(
+          controller: _serverUrlController,
+          style: const TextStyle(color: Colors.white),
+          decoration: InputDecoration(
+            labelText: 'Server URL',
+            labelStyle: TextStyle(color: Colors.grey[400]),
+            prefixIcon: const Icon(Icons.dns, color: Colors.blueAccent),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey[700]!),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey[700]!),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Colors.blueAccent),
+            ),
+            filled: true,
+            fillColor: Colors.grey[900],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Поле Player Name
+        TextField(
+          controller: _playerNameController,
+          style: const TextStyle(color: Colors.white),
+          decoration: InputDecoration(
+            labelText: 'Player Name',
+            labelStyle: TextStyle(color: Colors.grey[400]),
+            prefixIcon: const Icon(Icons.person, color: Colors.blueAccent),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey[700]!),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey[700]!),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Colors.blueAccent),
+            ),
+            filled: true,
+            fillColor: Colors.grey[900],
+          ),
+        ),
+        const SizedBox(height: 24),
+
+        // Разделитель
+        Row(
+          children: [
+            Expanded(child: Divider(color: Colors.grey[700])),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                'OR SELECT ROOM',
+                style: TextStyle(color: Colors.grey[500], fontSize: 12),
+              ),
+            ),
+            Expanded(child: Divider(color: Colors.grey[700])),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        // Список комнат
+        Container(
+          constraints: const BoxConstraints(maxHeight: 300),
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey[700]!),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: _isLoadingRooms
+              ? const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(32),
+                    child: CircularProgressIndicator(),
+                  ),
+                )
+              : _availableRooms.isEmpty
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Text(
+                      'No rooms available\nCreate a new one!',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.grey[500]),
+                    ),
+                  ),
+                )
+              : ListView.builder(
+                  itemCount: _availableRooms.length,
+                  itemBuilder: (context, index) {
+                    final room = _availableRooms[index];
+                    final isSelected = _selectedRoomId == room.id;
+                    return ListTile(
+                      leading: Icon(
+                        Icons.meeting_room,
+                        color: room.players >= room.maxPlayers
+                            ? Colors.red
+                            : Colors.green,
+                      ),
+                      title: Text(
+                        room.id,
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                      subtitle: Text(
+                        'Players: ${room.players}/${room.maxPlayers} • ${room.state}',
+                        style: TextStyle(color: Colors.grey[500]),
+                      ),
+                      trailing: isSelected
+                          ? const Icon(Icons.check_circle, color: Colors.green)
+                          : null,
+                      selected: isSelected,
+                      selectedTileColor: Colors.blueAccent.withOpacity(0.2),
+                      onTap: room.players < room.maxPlayers
+                          ? () {
+                              setState(() {
+                                _selectedRoomId = room.id;
+                                _roomIdController.clear();
+                              });
+                            }
+                          : null,
+                    );
+                  },
+                ),
+        ),
+        const SizedBox(height: 16),
+
+        // Поле Room ID (ручной ввод)
+        TextField(
+          controller: _roomIdController,
+          style: const TextStyle(color: Colors.white),
+          decoration: InputDecoration(
+            labelText: 'Room ID',
+            labelStyle: TextStyle(color: Colors.grey[400]),
+            prefixIcon: const Icon(Icons.key, color: Colors.blueAccent),
+            hintText: 'Or enter room ID manually',
+            hintStyle: TextStyle(color: Colors.grey[600]),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey[700]!),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.grey[700]!),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Colors.blueAccent),
+            ),
+            filled: true,
+            fillColor: Colors.grey[900],
+          ),
+          onChanged: (value) {
+            if (value.isNotEmpty) {
+              setState(() {
+                _selectedRoomId = null;
+              });
+            }
+          },
+        ),
+        const SizedBox(height: 24),
+
+        // Кнопки
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _isConnecting ? null : _testConnection,
+                icon: const Icon(Icons.bug_report),
+                label: const Text('Test'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  side: BorderSide(color: Colors.orange[700]!),
+                  foregroundColor: Colors.orange,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _isConnecting ? null : _loadRooms,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Refresh'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  side: BorderSide(color: Colors.grey[600]!),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _isConnecting ? null : _createNewRoom,
+                icon: const Icon(Icons.add),
+                label: const Text('Create'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  side: BorderSide(color: Colors.green[700]!),
+                  foregroundColor: Colors.green,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        // Кнопка Connect (главная)
+        ElevatedButton(
+          onPressed: _isConnecting ? null : _connectToGame,
+          style: ElevatedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            backgroundColor: Colors.blueAccent,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+          child: _isConnecting
+              ? const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Text(
+                  'CONNECT',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+        ),
+
+        const SizedBox(height: 24),
+
+        // Информация о сервере
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.grey[900],
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.info_outline, size: 16, color: Colors.grey[500]),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Server Info',
+                    style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Default server: ws://localhost:8080',
+                style: TextStyle(color: Colors.grey[600], fontSize: 11),
+              ),
+              Text(
+                'Make sure the server is running',
+                style: TextStyle(color: Colors.grey[600], fontSize: 11),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 
   @override
@@ -367,378 +798,122 @@ class _ConnectionScreenState extends State<ConnectionScreen> {
           ),
         ),
         child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Заголовок
-                  const Icon(Icons.games, size: 80, color: Colors.blueAccent),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'GRITS GAME',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                      letterSpacing: 4,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Multiplayer Arena Shooter',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 14, color: Colors.grey[400]),
-                  ),
-                  const SizedBox(height: 48),
-
-                  // Статус подключения
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[800],
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
+          child: Column(
+            children: [
+              // Верхняя панель с заголовком и переключателем
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Row(
                       children: [
-                        Icon(
-                          _connectionStatus.contains('Connected')
-                              ? Icons.check_circle
-                              : _connectionStatus.contains('failed')
-                              ? Icons.error
-                              : Icons.wifi,
-                          color: _connectionStatus.contains('Connected')
-                              ? Colors.green
-                              : _connectionStatus.contains('failed')
-                              ? Colors.red
-                              : Colors.yellow,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            _connectionStatus,
-                            style: TextStyle(
-                              color: Colors.grey[300],
-                              fontSize: 12,
-                            ),
+                        Icon(Icons.games, color: Colors.blueAccent, size: 32),
+                        SizedBox(width: 12),
+                        Text(
+                          'GRITS GAME',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
                           ),
                         ),
                       ],
                     ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Поле Server URL
-                  TextField(
-                    controller: _serverUrlController,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      labelText: 'Server URL',
-                      labelStyle: TextStyle(color: Colors.grey[400]),
-                      prefixIcon: const Icon(
-                        Icons.dns,
-                        color: Colors.blueAccent,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(color: Colors.grey[700]!),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(color: Colors.grey[700]!),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: Colors.blueAccent),
-                      ),
-                      filled: true,
-                      fillColor: Colors.grey[900],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Поле Player Name
-                  TextField(
-                    controller: _playerNameController,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      labelText: 'Player Name',
-                      labelStyle: TextStyle(color: Colors.grey[400]),
-                      prefixIcon: const Icon(
-                        Icons.person,
-                        color: Colors.blueAccent,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(color: Colors.grey[700]!),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(color: Colors.grey[700]!),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: Colors.blueAccent),
-                      ),
-                      filled: true,
-                      fillColor: Colors.grey[900],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Разделитель
-                  Row(
-                    children: [
-                      Expanded(child: Divider(color: Colors.grey[700])),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Text(
-                          'OR SELECT ROOM',
-                          style: TextStyle(
-                            color: Colors.grey[500],
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                      Expanded(child: Divider(color: Colors.grey[700])),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Список комнат
-                  Container(
-                    constraints: const BoxConstraints(maxHeight: 300),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey[700]!),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: _isLoadingRooms
-                        ? const Center(
-                            child: Padding(
-                              padding: EdgeInsets.all(32),
-                              child: CircularProgressIndicator(),
-                            ),
-                          )
-                        : _availableRooms.isEmpty
-                        ? Center(
-                            child: Padding(
-                              padding: const EdgeInsets.all(32),
-                              child: Text(
-                                'No rooms available\nCreate a new one!',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(color: Colors.grey[500]),
-                              ),
-                            ),
-                          )
-                        : ListView.builder(
-                            itemCount: _availableRooms.length,
-                            itemBuilder: (context, index) {
-                              final room = _availableRooms[index];
-                              final isSelected = _selectedRoomId == room.id;
-                              return ListTile(
-                                leading: Icon(
-                                  Icons.meeting_room,
-                                  color: room.players >= room.maxPlayers
-                                      ? Colors.red
-                                      : Colors.green,
-                                ),
-                                title: Text(
-                                  room.id,
-                                  style: const TextStyle(color: Colors.white),
-                                ),
-                                subtitle: Text(
-                                  'Players: ${room.players}/${room.maxPlayers} • ${room.state}',
-                                  style: TextStyle(color: Colors.grey[500]),
-                                ),
-                                trailing: isSelected
-                                    ? const Icon(
-                                        Icons.check_circle,
-                                        color: Colors.green,
-                                      )
-                                    : null,
-                                selected: isSelected,
-                                selectedTileColor: Colors.blueAccent
-                                    .withOpacity(0.2),
-                                onTap: room.players < room.maxPlayers
-                                    ? () {
-                                        setState(() {
-                                          _selectedRoomId = room.id;
-                                          _roomIdController.clear();
-                                        });
-                                      }
-                                    : null,
-                              );
-                            },
-                          ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Поле Room ID (ручной ввод)
-                  TextField(
-                    controller: _roomIdController,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      labelText: 'Room ID',
-                      labelStyle: TextStyle(color: Colors.grey[400]),
-                      prefixIcon: const Icon(
-                        Icons.key,
-                        color: Colors.blueAccent,
-                      ),
-                      hintText: 'Or enter room ID manually',
-                      hintStyle: TextStyle(color: Colors.grey[600]),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(color: Colors.grey[700]!),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(color: Colors.grey[700]!),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: Colors.blueAccent),
-                      ),
-                      filled: true,
-                      fillColor: Colors.grey[900],
-                    ),
-                    onChanged: (value) {
-                      if (value.isNotEmpty) {
-                        setState(() {
-                          _selectedRoomId = null;
-                        });
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Кнопки
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: _isConnecting ? null : _testConnection,
-                          icon: const Icon(Icons.bug_report),
-                          label: const Text('Test'),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            side: BorderSide(color: Colors.orange[700]!),
-                            foregroundColor: Colors.orange,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: _isConnecting ? null : _loadRooms,
-                          icon: const Icon(Icons.refresh),
-                          label: const Text('Refresh'),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            side: BorderSide(color: Colors.grey[600]!),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: _isConnecting ? null : _createNewRoom,
-                          icon: const Icon(Icons.add),
-                          label: const Text('Create'),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            side: BorderSide(color: Colors.green[700]!),
-                            foregroundColor: Colors.green,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Кнопка Connect (главная)
-                  ElevatedButton(
-                    onPressed: _isConnecting ? null : _connectToGame,
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      backgroundColor: Colors.blueAccent,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    child: _isConnecting
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Text(
-                            'CONNECT',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // Информация о сервере
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[900],
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Column(
+                    Row(
                       children: [
-                        Row(
+                        IconButton(
+                          icon: Icon(
+                            _showEventsPanel
+                                ? Icons.chevron_left
+                                : Icons.chevron_right,
+                            color: Colors.blueAccent,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              _showEventsPanel = !_showEventsPanel;
+                            });
+                          },
+                          tooltip: 'Toggle events panel',
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              // Основное содержимое
+              Expanded(
+                child: Row(
+                  children: [
+                    // Левая панель с формой подключения
+                    Expanded(
+                      flex: 2,
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(16),
+                        child: _buildConnectionForm(),
+                      ),
+                    ),
+
+                    // Правая панель с событиями (если видна)
+                    if (_showEventsPanel)
+                      Container(
+                        width: 350,
+                        decoration: BoxDecoration(
+                          border: Border(
+                            left: BorderSide(color: Colors.grey[800]!),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            Icon(
-                              Icons.info_outline,
-                              size: 16,
-                              color: Colors.grey[500],
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Server Info',
-                              style: TextStyle(
-                                color: Colors.grey[400],
-                                fontSize: 12,
+                            Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    '📡 Events Log',
+                                    style: TextStyle(
+                                      color: Colors.grey[400],
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  Row(
+                                    children: [
+                                      IconButton(
+                                        icon: Icon(
+                                          Icons.clear,
+                                          size: 20,
+                                          color: Colors.grey[500],
+                                        ),
+                                        onPressed: () =>
+                                            _eventLogger.clearEvents(),
+                                        tooltip: 'Clear events',
+                                      ),
+                                      IconButton(
+                                        icon: Icon(
+                                          Icons.download,
+                                          size: 20,
+                                          color: Colors.grey[500],
+                                        ),
+                                        onPressed: _exportEvents,
+                                        tooltip: 'Export events',
+                                      ),
+                                    ],
+                                  ),
+                                ],
                               ),
                             ),
+                            Expanded(child: EventsPanel(logger: _eventLogger)),
                           ],
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Default server: ws://localhost:8080',
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                            fontSize: 11,
-                          ),
-                        ),
-                        Text(
-                          'Make sure the server is running',
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                            fontSize: 11,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                      ),
+                  ],
+                ),
               ),
-            ),
+            ],
           ),
         ),
       ),

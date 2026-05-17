@@ -7,6 +7,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/status.dart' as status;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_grits/flame_game/entities/player.dart';
+import 'package:flutter_grits/ui/events_logger.dart';
 
 /// Состояние сетевого подключения
 enum ConnectionState {
@@ -67,6 +68,10 @@ class GameClient {
   // Состояние других игроков
   final Map<String, NetworkPlayer> _remotePlayers = {};
 
+  // Логгер событий
+  final EventsLogger _eventLogger = EventsLogger();
+  EventsLogger get eventLogger => _eventLogger;
+
   // Колбэки для обновления игрового мира
   Function(List<NetworkPlayer> players)? onPlayersUpdate;
   Function(String playerId, double x, double y, double angle, int weaponSlot)?
@@ -100,6 +105,12 @@ class GameClient {
     String playerName,
     String roomId,
   ) async {
+    _eventLogger.addEvent(
+      'connecting',
+      message: 'Connecting to $serverUrl',
+      roomId: roomId,
+    );
+
     if (_connectionState == ConnectionState.connecting ||
         _connectionState == ConnectionState.connected) {
       disconnect();
@@ -120,6 +131,11 @@ class GameClient {
         _handleMessage,
         onError: (error) {
           debugPrint('❌ WebSocket error: $error');
+          _eventLogger.addEvent(
+            'error',
+            message: 'WebSocket error: $error',
+            roomId: roomId,
+          );
           if (!_connectCompleter!.isCompleted) {
             _connectCompleter!.completeError('WebSocket error: $error');
           }
@@ -127,6 +143,11 @@ class GameClient {
         },
         onDone: () {
           debugPrint('🔌 WebSocket closed');
+          _eventLogger.addEvent(
+            'disconnected',
+            message: 'WebSocket connection closed',
+            roomId: roomId,
+          );
           if (!_connectCompleter!.isCompleted) {
             _connectCompleter!.completeError('Connection closed');
           }
@@ -146,13 +167,29 @@ class GameClient {
         const Duration(seconds: 5),
         onTimeout: () {
           debugPrint('❌ Connection timeout after 5 seconds');
+          _eventLogger.addEvent(
+            'error',
+            message: 'Connection timeout - server not responding',
+            roomId: roomId,
+          );
           throw Exception('Connection timeout. Server not responding.');
         },
       );
 
       debugPrint('✅ Successfully connected as player: $playerId');
+      _eventLogger.addEvent(
+        'connected',
+        message: 'Connected as player: $playerId',
+        roomId: roomId,
+        playerId: playerId,
+      );
     } catch (e) {
       debugPrint('❌ Failed to connect: $e');
+      _eventLogger.addEvent(
+        'error',
+        message: 'Connection failed: $e',
+        roomId: roomId,
+      );
       if (!_connectCompleter!.isCompleted) {
         _connectCompleter!.completeError(e);
       }
@@ -312,6 +349,12 @@ class GameClient {
     _setConnectionState(ConnectionState.connected);
 
     debugPrint('✅ Joined room as $_playerId, team: ${data['team']}');
+    _eventLogger.addEvent(
+      'joined_room',
+      roomId: _currentRoomId,
+      playerId: _playerId,
+      message: 'Team: ${data['team'] == 0 ? 'Blue' : 'Red'}',
+    );
 
     // Завершаем ожидание подключения
     if (_connectCompleter != null && !_connectCompleter!.isCompleted) {
@@ -326,6 +369,15 @@ class GameClient {
 
   void _handlePlayerJoined(Map<String, dynamic> data) {
     final player = data['player'] as Map<String, dynamic>;
+
+    debugPrint('👤 Player joined: ${player['name']}');
+    _eventLogger.addEvent(
+      'player_joined',
+      roomId: _currentRoomId,
+      playerId: player['id'],
+      message: '${player['name']} joined the game',
+    );
+
     final netPlayer = NetworkPlayer(
       id: player['id'],
       name: player['name'],
@@ -421,6 +473,14 @@ class GameClient {
 
   void _handleShoot(Map<String, dynamic> data) {
     final shooterId = data['playerId'] as String;
+
+    _eventLogger.addEvent(
+      'player_shot',
+      roomId: _currentRoomId,
+      playerId: shooterId,
+      message: 'Shot fired',
+    );
+
     final position = data['position'] as Map<String, dynamic>;
     final x = (position['x'] as num).toDouble();
     final y = (position['y'] as num).toDouble();
@@ -441,6 +501,14 @@ class GameClient {
   void _handlePlayerDied(Map<String, dynamic> data) {
     final playerId = data['playerId'] as String;
     final killerId = data['killerId'] as String;
+
+    debugPrint('💀 Player $playerId killed by $killerId');
+    _eventLogger.addEvent(
+      'player_killed',
+      roomId: _currentRoomId,
+      playerId: playerId,
+      message: 'Player $playerId killed by $killerId',
+    );
 
     onPlayerDied?.call(playerId, killerId);
   }
@@ -490,6 +558,12 @@ class GameClient {
   void _handleDisconnect() {
     _stopPing();
     _channel = null;
+
+    _eventLogger.addEvent(
+      'disconnected',
+      roomId: _currentRoomId,
+      message: 'Connection lost',
+    );
 
     if (_connectionState == ConnectionState.connected) {
       _setConnectionState(ConnectionState.reconnecting);

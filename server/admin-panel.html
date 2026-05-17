@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Grits Game Admin Panel — Управление сервером</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: #0a0c15;
+            color: #eef2ff;
+            padding: 24px;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        /* Header */
+        .admin-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-bottom: 32px;
+            background: linear-gradient(135deg, #0f111f 0%, #0b0d18 100%);
+            padding: 20px 28px;
+            border-radius: 28px;
+            border: 1px solid #232838;
+            backdrop-filter: blur(4px);
+        }
+
+        .title-section h1 {
+            font-size: 1.9rem;
+            background: linear-gradient(135deg, #c084fc, #60a5fa);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            letter-spacing: -0.3px;
+        }
+
+        .title-section p {
+            color: #7e8aad;
+            font-size: 0.85rem;
+            margin-top: 6px;
+        }
+
+        .stats-grid {
+            display: flex;
+            gap: 24px;
+            flex-wrap: wrap;
+        }
+
+        .stat-card {
+            background: #11161f;
+            border-radius: 20px;
+            padding: 8px 18px;
+            text-align: center;
+            border: 1px solid #293040;
+        }
+
+        .stat-number {
+            font-size: 1.7rem;
+            font-weight: 700;
+            color: #c084fc;
+        }
+
+        .stat-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #7f8ea3;
+        }
+
+        /* Dashboard layout */
+        .dashboard {
+            display: flex;
+            flex-direction: column;
+            gap: 28px;
+        }
+
+        /* Комнаты - главная сетка */
+        .rooms-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+            gap: 24px;
+        }
+
+        .room-card {
+            background: #0f131e;
+            border-radius: 28px;
+            border: 1px solid #262d3e;
+            overflow: hidden;
+            transition: all 0.2s;
+            backdrop-filter: blur(2px);
+        }
+
+        .room-card:hover {
+            border-color: #4f46e5;
+            box-shadow: 0 8px 24px rgba(79, 70, 229, 0.15);
+        }
+
+        .room-header {
+            background: #0b0e17;
+            padding: 16px 20px;
+            border-bottom: 1px solid #1f2538;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+        }
+
+        .room-name {
+            font-weight: 700;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .room-badge {
+            background: #1e293b;
+            padding: 4px 12px;
+            border-radius: 40px;
+            font-size: 0.7rem;
+            font-weight: 500;
+        }
+
+        .room-state {
+            padding: 4px 12px;
+            border-radius: 40px;
+            font-size: 0.7rem;
+            font-weight: bold;
+        }
+
+        .state-waiting { background: #854d0e; color: #fde047; }
+        .state-playing { background: #166534; color: #86efac; }
+        .state-ended { background: #4c1d95; color: #d8b4fe; }
+
+        .room-body {
+            padding: 16px 20px;
+        }
+
+        .players-list {
+            margin: 12px 0;
+            max-height: 280px;
+            overflow-y: auto;
+        }
+
+        .player-row {
+            background: #0a0e16;
+            margin: 8px 0;
+            padding: 10px 12px;
+            border-radius: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-left: 3px solid #4f46e5;
+        }
+
+        .player-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .player-name {
+            font-weight: 600;
+        }
+
+        .player-stats {
+            font-size: 0.7rem;
+            color: #9aa3bf;
+            display: flex;
+            gap: 12px;
+            margin-top: 4px;
+        }
+
+        .player-team {
+            background: #232a3f;
+            padding: 2px 8px;
+            border-radius: 20px;
+            font-size: 0.65rem;
+        }
+
+        .items-preview {
+            background: #070a10;
+            border-radius: 18px;
+            padding: 12px;
+            margin: 12px 0;
+            font-size: 0.7rem;
+        }
+
+        .room-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 14px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            background: #1e2438;
+            border: none;
+            color: #e2e8f0;
+            padding: 8px 14px;
+            border-radius: 40px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        button.primary {
+            background: #4f46e5;
+            color: white;
+        }
+
+        button.danger {
+            background: #7f1a1a;
+            color: #ffb3b3;
+        }
+
+        button.warning {
+            background: #b45309;
+            color: #ffddb0;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            filter: brightness(1.05);
+        }
+
+        .create-room-panel {
+            background: #0f131e;
+            border-radius: 28px;
+            padding: 20px 24px;
+            border: 1px solid #262d3e;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: flex-end;
+            gap: 16px;
+            margin-bottom: 10px;
+        }
+
+        .create-room-panel input {
+            background: #191e2c;
+            border: 1px solid #2d354a;
+            padding: 12px 16px;
+            border-radius: 30px;
+            color: white;
+            flex: 1;
+            min-width: 180px;
+        }
+
+        .logs-panel {
+            background: #0b0f18;
+            border-radius: 24px;
+            border: 1px solid #262e42;
+            margin-top: 20px;
+        }
+
+        .logs-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid #1e253a;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .log-area {
+            max-height: 280px;
+            overflow-y: auto;
+            font-family: 'Fira Code', monospace;
+            font-size: 12px;
+            padding: 12px;
+        }
+
+        .log-line {
+            padding: 5px 10px;
+            border-bottom: 1px solid #151c2a;
+            font-family: monospace;
+        }
+
+        .badge-online {
+            background: #15803d;
+            border-radius: 30px;
+            padding: 2px 10px;
+            font-size: 0.7rem;
+        }
+
+        hr {
+            border-color: #232838;
+            margin: 10px 0;
+        }
+
+        .flex-between {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .empty-state {
+            text-align: center;
+            color: #5f6c8a;
+            padding: 40px;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.6; }
+            100% { opacity: 1; }
+        }
+
+        .refresh-tag {
+            font-size: 0.7rem;
+            color: #5f6c8a;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="admin-header">
+        <div class="title-section">
+            <h1>🎮 Grits Game | Admin Console</h1>
+            <p>Управление комнатами, мониторинг игроков, события в реальном времени</p>
+        </div>
+        <div class="stats-grid" id="globalStats">
+            <div class="stat-card">
+                <div class="stat-number" id="statRooms">0</div>
+                <div class="stat-label">Комнат</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="statPlayers">0</div>
+                <div class="stat-label">Игроков</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="statPlaying">0</div>
+                <div class="stat-label">В игре</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="statUptime">0</div>
+                <div class="stat-label">Uptime (s)</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="dashboard">
+        <!-- Панель создания комнаты -->
+        <div class="create-room-panel">
+            <input type="text" id="newRoomId" placeholder="ID новой комнаты (например, arena_4v4)" value="admin_room">
+            <input type="number" id="newRoomMaxPlayers" placeholder="Max игроков" value="4" style="width: 130px;">
+            <button id="createRoomBtn" class="primary">➕ Создать комнату (HTTP)</button>
+            <button id="refreshAllBtn">🔄 Обновить все комнаты</button>
+            <span class="refresh-tag" id="wsStatusBadge">⚫ WebSocket: Ожидание</span>
+        </div>
+
+        <!-- Сетка комнат -->
+        <div id="roomsContainer" class="rooms-grid">
+            <div class="empty-state">Загрузка комнат... либо сервер не отвечает</div>
+        </div>
+
+        <!-- Панель логов администратора -->
+        <div class="logs-panel">
+            <div class="logs-header">
+                <span>📋 Логи событий (админ-мониторинг)</span>
+                <div>
+                    <button id="clearAdminLogsBtn" style="background:#151e2a;">Очистить</button>
+                    <button id="forceServerPingBtn">🏓 Ping сервера</button>
+                </div>
+            </div>
+            <div id="adminLogArea" class="log-area">
+                <div class="log-line">✨ Панель администратора запущена. Ожидание данных...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --------------------- ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ---------------------
+    let adminWs = null;          // выделенный WebSocket для админ-мониторинга (подключаемся к /stats-stream? необязательно, но для живых событий используем тот же протокол, будем подключаться как фейковый "наблюдатель")
+    let roomsData = new Map();   // roomId -> full room object
+    let pollInterval = null;
+    let httpBaseUrl = "http://localhost:8080";
+    let wsBaseUrl = "ws://localhost:8080";
+    let isAdminWsConnected = false;
+
+    // элементы
+    const roomsContainer = document.getElementById('roomsContainer');
+    const statRoomsSpan = document.getElementById('statRooms');
+    const statPlayersSpan = document.getElementById('statPlayers');
+    const statPlayingSpan = document.getElementById('statPlaying');
+    const statUptimeSpan = document.getElementById('statUptime');
+    const refreshBtn = document.getElementById('refreshAllBtn');
+    const createRoomBtn = document.getElementById('createRoomBtn');
+    const newRoomIdInput = document.getElementById('newRoomId');
+    const newRoomMaxPlayers = document.getElementById('newRoomMaxPlayers');
+    const wsStatusBadge = document.getElementById('wsStatusBadge');
+    const adminLogArea = document.getElementById('adminLogArea');
+    const clearAdminLogsBtn = document.getElementById('clearAdminLogsBtn');
+    const forceServerPingBtn = document.getElementById('forceServerPingBtn');
+
+    // Локальное логирование админа
+    function addAdminLog(message, type = 'info') {
+        const time = new Date().toLocaleTimeString('ru-RU', { hour12: false });
+        const logDiv = document.createElement('div');
+        logDiv.className = 'log-line';
+        let color = '#b9c7e0';
+        if (type === 'error') color = '#ffa2a2';
+        if (type === 'success') color = '#a5f0c0';
+        if (type === 'warn') color = '#ffcc88';
+        logDiv.innerHTML = `<span style="color:#6f7c9e;">[${time}]</span> <span style="color:${color}">${message}</span>`;
+        adminLogArea.appendChild(logDiv);
+        logDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        while (adminLogArea.children.length > 350) adminLogArea.removeChild(adminLogArea.firstChild);
+    }
+
+    // Получение базового URL из текущего location (можно переопределить)
+    function detectServerUrl() {
+        // используем localhost:8080 как дефолт, но даем возможность вручную через промпт?
+        return { http: "http://localhost:8080", ws: "ws://localhost:8080" };
+    }
+
+    // Запрос статистики и комнат с REST API
+    async function fetchAllRoomsAndStats() {
+        try {
+            const [roomsRes, statsRes, pingRes] = await Promise.allSettled([
+                fetch(`${httpBaseUrl}/rooms`),
+                fetch(`${httpBaseUrl}/stats`),
+                fetch(`${httpBaseUrl}/ping`)
+            ]);
+            
+            let roomsList = [];
+            let serverStats = {};
+            let uptimeSec = 0;
+            
+            if (roomsRes.status === 'fulfilled' && roomsRes.value.ok) {
+                roomsList = await roomsRes.value.json();
+            } else {
+                addAdminLog(`⚠️ Не удалось получить комнаты: ${roomsRes.status === 'rejected' ? roomsRes.reason?.message : 'HTTP error'}`, 'warn');
+            }
+            
+            if (statsRes.status === 'fulfilled' && statsRes.value.ok) {
+                const statsData = await statsRes.value.json();
+                serverStats = statsData.serverStats || {};
+                uptimeSec = statsData.uptime || 0;
+            }
+            
+            if (pingRes.status === 'fulfilled' && pingRes.value.ok) {
+                const pingData = await pingRes.value.json();
+                uptimeSec = pingData.uptime || uptimeSec;
+            }
+            
+            // Обновляем глобальную статистику
+            let totalPlayers = 0;
+            let playingGames = 0;
+            const roomsMap = new Map();
+            
+            if (Array.isArray(roomsList)) {
+                roomsList.forEach(room => {
+                    roomsMap.set(room.id, {
+                        id: room.id,
+                        playersCount: room.players || 0,
+                        maxPlayers: room.maxPlayers || 4,
+                        state: room.state || 'waiting',
+                        playersDetails: room.playersDetails || []   // может быть пусто, позже дополним через детальный просмотр
+                    });
+                    totalPlayers += (room.players || 0);
+                    if (room.state === 'playing') playingGames++;
+                });
+            }
+            
+            // Дополнительно для каждой комнаты можно запросить /room/:id/details? но нет такого эндпоинта. Используем данные с сервера.
+            // Для реализма мы можем хранить roomsData
+            roomsData.clear();
+            for (let [id, data] of roomsMap.entries()) {
+                roomsData.set(id, { ...data, detailedPlayers: [] });
+            }
+            
+            // Пытаемся получить более детальную информацию — через WebSocket? Необходимо для показа имён игроков.
+            // Но мы можем также из WebSocket админ-канала получать обновления. Создадим админ-клиент, который слушает всё.
+            
+            // Статистика
+            statRoomsSpan.innerText = roomsData.size;
+            statPlayersSpan.innerText = totalPlayers;
+            statPlayingSpan.innerText = playingGames;
+            statUptimeSpan.innerText = Math.floor(uptimeSec);
+            
+            renderRoomsGrid();
+            addAdminLog(`📡 Обновлены данные: ${roomsData.size} комнат, ${totalPlayers} игроков`, 'info');
+            return true;
+        } catch (err) {
+            addAdminLog(`❌ Ошибка запроса к серверу: ${err.message}`, 'error');
+            roomsContainer.innerHTML = `<div class="empty-state">⚠️ Не удалось соединиться с сервером. Убедитесь, что сервер запущен на ${httpBaseUrl}</div>`;
+            return false;
+        }
+    }
+
+    // Рендер всех комнат с карточками и кнопками управления
+    function renderRoomsGrid() {
+        if (roomsData.size === 0) {
+            roomsContainer.innerHTML = `<div class="empty-state">✨ Нет активных комнат. Создайте новую или подождите подключений.</div>`;
+            return;
+        }
+        
+        let html = '';
+        for (let [roomId, room] of roomsData.entries()) {
+            const stateClass = room.state === 'playing' ? 'state-playing' : (room.state === 'waiting' ? 'state-waiting' : 'state-ended');
+            const stateText = room.state === 'playing' ? '🎮 В ИГРЕ' : (room.state === 'waiting' ? '⏳ Ожидание' : '🏁 Завершена');
+            
+            html += `
+                <div class="room-card" data-room-id="${roomId}">
+                    <div class="room-header">
+                        <div class="room-name">
+                            🏠 ${escapeHtml(roomId)}
+                            <span class="room-badge">👥 ${room.playersCount || 0}/${room.maxPlayers}</span>
+                        </div>
+                        <div class="room-state ${stateClass}">${stateText}</div>
+                    </div>
+                    <div class="room-body">
+                        <div class="players-list" id="players-list-${roomId}">
+                            ${renderPlayersPlaceholder(roomId)}
+                        </div>
+                        <div class="room-actions">
+                            <button class="refresh-players-btn" data-room="${roomId}">🔄 Обновить игроков</button>
+                            <button class="force-end-btn warning" data-room="${roomId}">⏹️ Принудительно завершить</button>
+                            <button class="delete-room-btn danger" data-room="${roomId}">🗑️ Удалить комнату</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        roomsContainer.innerHTML = html;
+        
+        // Привязываем события после рендера
+        document.querySelectorAll('.refresh-players-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const rid = btn.getAttribute('data-room');
+                await fetchRoomPlayersDetails(rid);
+            });
+        });
+        
+        document.querySelectorAll('.force-end-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const rid = btn.getAttribute('data-room');
+                await forceEndGame(rid);
+            });
+        });
+        
+        document.querySelectorAll('.delete-room-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const rid = btn.getAttribute('data-room');
+                await deleteRoomByAdmin(rid);
+            });
+        });
+    }
+    
+    function renderPlayersPlaceholder(roomId) {
+        const room = roomsData.get(roomId);
+        if (!room || !room.detailedPlayers || room.detailedPlayers.length === 0) {
+            return `<div style="color:#6f7c9e; padding: 12px; text-align:center;">👥 Информация об игроках не загружена (нажмите обновить)</div>`;
+        }
+        let playersHtml = '';
+        room.detailedPlayers.forEach(p => {
+            playersHtml += `
+                <div class="player-row">
+                    <div class="player-info">
+                        <span class="player-name">${escapeHtml(p.name || p.id)}</span>
+                        <div class="player-stats">
+                            <span>❤️ ${p.health ?? '?'}</span>
+                            <span>🔋 ${p.energy ?? '?'}</span>
+                            <span class="player-team">${p.team === 0 ? '🔵 Синие' : '🔴 Красные'}</span>
+                            ${p.isDead ? '<span>💀 Мёртв</span>' : ''}
+                        </div>
+                    </div>
+                    <span style="font-size:0.7rem">${p.kills || 0} убийств</span>
+                </div>
+            `;
+        });
+        return playersHtml;
+    }
+    
+    // Запрос деталей игроков через HTTP? Сервер не отдает player details, но мы можем использовать WebSocket администратора,
+    // который подключается к комнатам как слушатель. Сделаем универсальный метод: попробуем через REST ? но /rooms не отдает имена.
+    // В качестве админ-функции мы будем использовать тот же механизм, что и обычный клиент, но только чтобы слушать события.
+    // Для упрощения — сделаем дополнительный фетч через /stats и /ping, но имена игроков могут быть недоступны.
+    // Поэтому предложим улучшенный подход: админ создает скрытого наблюдателя в комнате (бот-наблюдатель). 
+    // Для демонстрации покажем детали из глобальных событий, которые приходят через WebSocket.
+    async function fetchRoomPlayersDetails(roomId) {
+        addAdminLog(`🔍 Запрос деталей комнаты ${roomId} (через WebSocket-наблюдателя)`, 'info');
+        // Временно добавляем демо-данные, чтобы показать интерфейс: но на настоящем сервере нет API, 
+        // поэтому попробуем из roomsData которая может содержать только количество. Сделаем имитацию запроса к серверу через /ping ? 
+        // Реально для полного функционала нужно подключаться к WebSocket комнаты с ролью админа.
+        // Для целей админки - используем подписку через отдельный WebSocket, который мы откроем и будем мониторить.
+        await connectAdminObserver(roomId);
+        // После подключения наблюдателя, события player_joined и game_state будут наполнять данные.
+        addAdminLog(`📡 Наблюдатель для ${roomId} активирован, ждем данные...`, 'success');
+    }
+    
+    // Admin WebSocket Observer — подключаемся к комнате как безымянный наблюдатель? сервер требует join. Поэтому можно присоединиться с именем "AdminObserver"
+    let adminObservers = new Map(); // roomId -> ws
+    async function connectAdminObserver(roomId) {
+        if (adminObservers.has(roomId)) {
+            const existing = adminObservers.get(roomId);
+            if (existing.readyState === WebSocket.OPEN) return;
+        }
+        const ws = new WebSocket(wsBaseUrl);
+        ws.onopen = () => {
+            ws.send(JSON.stringify({
+                type: "join",
+                playerName: `🛡️Admin_${Date.now()}`,
+                roomId: roomId
+            }));
+            addAdminLog(`👁️ Наблюдатель подключился к комнате ${roomId}`, 'success');
+        };
+        ws.onmessage = (ev) => {
+            try {
+                const data = JSON.parse(ev.data);
+                if (data.type === 'joined' || data.type === 'game_state' || data.type === 'player_joined') {
+                    updateRoomFromObserver(roomId, data);
+                }
+                if (data.type === 'player_left') {
+                    removePlayerFromRoomObserver(roomId, data.playerId);
+                }
+            } catch(e) {}
+        };
+        ws.onclose = () => {
+            adminObservers.delete(roomId);
+        };
+        adminObservers.set(roomId, ws);
+    }
+    
+    function updateRoomFromObserver(roomId, msg) {
+        let room = roomsData.get(roomId);
+        if (!room) {
+            room = { id: roomId, playersCount: 0, detailedPlayers: [], state: 'waiting' };
+            roomsData.set(roomId, room);
+        }
+        if (msg.type === 'joined' && msg.players) {
+            room.detailedPlayers = msg.players.map(p => ({
+                id: p.id,
+                name: p.name,
+                team: p.team,
+                health: p.health,
+                energy: p.energy,
+                isDead: p.isDead,
+                kills: p.kills || 0
+            }));
+            room.playersCount = room.detailedPlayers.length;
+        } else if (msg.type === 'game_state' && msg.state && msg.state.players) {
+            const updatedPlayers = msg.state.players;
+            const currentMap = new Map(room.detailedPlayers.map(p => [p.id, p]));
+            updatedPlayers.forEach(np => {
+                const existing = currentMap.get(np.id);
+                if (existing) {
+                    existing.health = np.health;
+                    existing.isDead = np.isDead;
+                    existing.position = np.position;
+                } else {
+                    currentMap.set(np.id, { id: np.id, name: np.name || np.id, team: np.team, health: np.health, isDead: np.isDead });
+                }
+            });
+            room.detailedPlayers = Array.from(currentMap.values());
+            room.playersCount = room.detailedPlayers.length;
+        } else if (msg.type === 'player_joined' && msg.player) {
+            const exists = room.detailedPlayers.some(p => p.id === msg.player.id);
+            if (!exists) {
+                room.detailedPlayers.push({
+                    id: msg.player.id,
+                    name: msg.player.name,
+                    team: msg.player.team,
+                    health: 100,
+                    isDead: false
+                });
+                room.playersCount = room.detailedPlayers.length;
+            }
+        }
+        roomsData.set(roomId, room);
+        renderRoomsGrid();
+    }
+    
+    function removePlayerFromRoomObserver(roomId, playerId) {
+        const room = roomsData.get(roomId);
+        if (room) {
+            room.detailedPlayers = room.detailedPlayers.filter(p => p.id !== playerId);
+            room.playersCount = room.detailedPlayers.length;
+            roomsData.set(roomId, room);
+            renderRoomsGrid();
+        }
+    }
+    
+    // Админ-действия
+    async function forceEndGame(roomId) {
+        addAdminLog(`⚠️ Принудительное завершение игры в комнате ${roomId} (отправка broadcast game_ended)`, 'warn');
+        // Сервер не имеет прямого API для окончания, но можно отправить команду через админского WebSocket?
+        // Реализуем через HTTP-заглушку: используем симуляцию — но для реального сервера надо добавить endpoint.
+        // В текущем server.js нет эндпоинта /admin/end-room. Поэтому отправим команду через наблюдателя, если есть соединение.
+        const observer = adminObservers.get(roomId);
+        if (observer && observer.readyState === WebSocket.OPEN) {
+            observer.send(JSON.stringify({ type: "admin_end_game", roomId })); // сервер не обработает, но демонстрация.
+            addAdminLog(`⚠️ Сервер не поддерживает admin_end_game, но в реальности нужно расширить API`, 'error');
+        } else {
+            addAdminLog(`❌ Невозможно завершить игру: у комнаты нет активного WebSocket наблюдателя`, 'error');
+        }
+        // Временно предложим удалить комнату вручную
+    }
+    
+    async function deleteRoomByAdmin(roomId) {
+        addAdminLog(`🗑️ Удаление комнаты ${roomId} (kick всех игроков)`, 'warn');
+        // Попробуем отправить принудительный leave каждому через наблюдателя?
+        // В текущей реализации сервера нет массового удаления, но можно закрыть WebSocket наблюдателя и удалить из roomsData.
+        const observer = adminObservers.get(roomId);
+        if (observer) observer.close();
+        adminObservers.delete(roomId);
+        roomsData.delete(roomId);
+        renderRoomsGrid();
+        addAdminLog(`✅ Комната ${roomId} удалена из админ-панели (игроки останутся на сервере, но UI очищен)`, 'info');
+        await fetchAllRoomsAndStats(); // пересинхронизируем
+    }
+    
+    async function createRoom() {
+        const roomId = newRoomIdInput.value.trim();
+        const maxPl = parseInt(newRoomMaxPlayers.value) || 4;
+        if (!roomId) return addAdminLog('Введите ID комнаты', 'error');
+        try {
+            const res = await fetch(`${httpBaseUrl}/create-room`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ roomId, maxPlayers: maxPl })
+            });
+            if (res.ok) {
+                addAdminLog(`✅ Комната "${roomId}" создана успешно`, 'success');
+                await fetchAllRoomsAndStats();
+            } else {
+                const err = await res.json();
+                addAdminLog(`❌ Ошибка: ${err.error || 'unknown'}`, 'error');
+            }
+        } catch(e) {
+            addAdminLog(`❌ HTTP ошибка: ${e.message}`, 'error');
+        }
+    }
+    
+    // Ping сервера и проверка соединения
+    async function pingServer() {
+        try {
+            const start = Date.now();
+            const res = await fetch(`${httpBaseUrl}/ping`);
+            const data = await res.json();
+            const latency = Date.now() - start;
+            addAdminLog(`🏓 Сервер отвечает (${latency}ms): игр ${data.games || 0}, игроков ${data.players || 0}`, 'success');
+        } catch(e) {
+            addAdminLog(`❌ Сервер недоступен: ${e.message}`, 'error');
+        }
+    }
+    
+    function escapeHtml(str) { return String(str).replace(/[&<>]/g, function(m){if(m==='&') return '&amp;'; if(m==='<') return '&lt;'; if(m==='>') return '&gt;'; return m;});}
+    
+    // Инициализация и цикл обновления
+    async function init() {
+        const urls = detectServerUrl();
+        httpBaseUrl = urls.http;
+        wsBaseUrl = urls.ws;
+        wsStatusBadge.innerText = `🌐 HTTP: ${httpBaseUrl}`;
+        await fetchAllRoomsAndStats();
+        if (pollInterval) clearInterval(pollInterval);
+        pollInterval = setInterval(() => {
+            fetchAllRoomsAndStats();
+        }, 5000);
+    }
+    
+    // Обработчики
+    refreshBtn.onclick = () => fetchAllRoomsAndStats();
+    createRoomBtn.onclick = () => createRoom();
+    clearAdminLogsBtn.onclick = () => { adminLogArea.innerHTML = '<div class="log-line">🧹 Логи очищены</div>'; };
+    forceServerPingBtn.onclick = () => pingServer();
+    
+    init();
+</script>
+</body>
+</html>

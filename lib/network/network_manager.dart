@@ -5,6 +5,7 @@ import 'package:flutter_grits/flame_game/entities/player.dart';
 import 'package:flutter_grits/flame_game/managers/resource_manager.dart';
 import 'package:flutter_grits/network/game_client.dart'
     show GameClient, ConnectionState, NetworkPlayer;
+import 'package:flutter_grits/ui/events_logger.dart';
 
 /// Менеджер сети для синхронизации игрового мира
 class NetworkManager {
@@ -13,6 +14,9 @@ class NetworkManager {
 
   String? _localPlayerId;
   final Map<String, RemotePlayerComponent> _remotePlayers = {};
+
+  // Геттер для доступа к логгеру событий
+  EventsLogger get eventLogger => _client.eventLogger;
 
   NetworkManager({required this.gameWorld}) {
     _setupCallbacks();
@@ -101,21 +105,55 @@ class NetworkManager {
     String playerName,
     String roomId,
   ) async {
+    eventLogger.addEvent(
+      'connecting',
+      message: 'Connecting to room: $roomId',
+      roomId: roomId,
+    );
+
     debugPrint('🔌 NetworkManager.connect called');
     debugPrint('  Server: $serverUrl');
     debugPrint('  Player: $playerName');
     debugPrint('  Room: $roomId');
 
     try {
-      // Ждём подтверждения подключения от клиента
-      await _client.connect(serverUrl, playerName, roomId);
+      // Убеждаемся, что URL правильный
+      String wsUrl = serverUrl;
+      if (!wsUrl.startsWith('ws://') && !wsUrl.startsWith('wss://')) {
+        wsUrl = 'ws://$serverUrl';
+      }
+
+      // Если порт не указан, добавляем :8080
+      if (!wsUrl.contains(':8080') &&
+          !wsUrl.contains(':') &&
+          !wsUrl.contains('wss')) {
+        wsUrl = '$wsUrl:8080';
+      }
+
+      debugPrint('  Final WebSocket URL: $wsUrl');
+      eventLogger.addEvent('connecting', message: 'WebSocket URL: $wsUrl');
+
+      await _client.connect(wsUrl, playerName, roomId);
 
       _localPlayerId = _client.playerId;
 
+      eventLogger.addEvent(
+        'connected',
+        message: 'Successfully connected to server as $_localPlayerId',
+        roomId: roomId,
+        playerId: _localPlayerId,
+      );
+
       debugPrint('✅ NetworkManager connected successfully');
       debugPrint('  Local player ID: $_localPlayerId');
-    } catch (e) {
+    } catch (e, stackTrace) {
+      eventLogger.addEvent(
+        'error',
+        message: 'Connection failed: $e',
+        roomId: roomId,
+      );
       debugPrint('❌ NetworkManager connection failed: $e');
+      debugPrint('Stack trace: $stackTrace');
       rethrow;
     }
   }

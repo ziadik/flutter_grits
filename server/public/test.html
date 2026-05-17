@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grits Game - Тестовый клиент</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        .test-panel { max-width: 800px; margin: 0 auto; }
+        .conn-info { background: #1a212f; border-radius: 14px; padding: 15px; margin: 20px 0; }
+        .action-buttons { display: flex; gap: 10px; flex-wrap: wrap; margin: 20px 0; }
+        .game-log { background: #0b0e16; border-radius: 16px; padding: 12px; height: 400px; overflow-y: auto; font-family: monospace; font-size: 12px; margin-top: 20px; }
+    </style>
+</head>
+<body>
+<div class="container test-panel">
+    <div class="header"><h1>🎮 Grits Game - Тестовый клиент</h1><p>Подключение к серверу • Тестирование игровых событий</p></div>
+    <div class="card">
+        <h2>🔌 Подключение</h2>
+        <div class="flex-row">
+            <input type="text" id="wsUrl" value="ws://localhost:8080" placeholder="ws://localhost:8080" style="flex:2">
+            <input type="text" id="playerName" placeholder="Имя" style="flex:1">
+            <input type="text" id="roomId" value="test_room" placeholder="Комната" style="flex:1">
+        </div>
+        <div class="flex-row" style="margin-top:12px">
+            <button id="connectBtn" class="primary">🔗 Подключиться</button>
+            <button id="disconnectBtn" disabled>❌ Отключить</button>
+        </div>
+        <div class="conn-info">
+            <div class="flex-between"><span>📡 Статус:</span><span id="connStatus" class="status-badge status-offline">Отключен</span></div>
+            <div class="flex-between"><span>🆔 Ваш ID:</span><span id="myPlayerId">—</span></div>
+            <div class="flex-between"><span>👥 Команда:</span><span id="myTeam">—</span></div>
+        </div>
+        <h2>🎮 Действия</h2>
+        <div class="action-buttons">
+            <button id="shootBtn" class="primary" disabled>🔫 Выстрел</button>
+            <button id="pingBtn" disabled>🏓 Ping</button>
+            <button id="leaveBtn" class="danger" disabled>🚪 Выйти</button>
+        </div>
+        <h2>📋 Логи</h2>
+        <div id="logContainer" class="game-log"><div class="log-entry">📡 Готов к подключению...</div></div>
+    </div>
+</div>
+<script>
+    let ws = null, connected = false;
+    function addLog(msg, type='info') {
+        const d = document.createElement('div'); d.className = 'log-entry';
+        const time = new Date().toLocaleTimeString();
+        d.innerHTML = `<span class="log-time">[${time}]</span> <span class="log-${type}">${msg}</span>`;
+        document.getElementById('logContainer').appendChild(d); d.scrollIntoView();
+    }
+    function sendMessage(type, payload) { if(ws?.readyState === WebSocket.OPEN) { ws.send(JSON.stringify({type,...payload})); addLog(`📤 ${type}`, 'info'); } }
+    function connect() {
+        const url = document.getElementById('wsUrl').value;
+        let name = document.getElementById('playerName').value;
+        const room = document.getElementById('roomId').value;
+        if(!name) { name = 'Tester_'+Math.floor(Math.random()*1000); document.getElementById('playerName').value = name; }
+        ws = new WebSocket(url);
+        ws.onopen = () => { connected=true; document.getElementById('connStatus').innerHTML='Подключен'; document.getElementById('connStatus').className='status-badge status-online'; addLog('✅ Подключен','success'); sendMessage('join',{playerName:name,roomId:room}); enableBtns(true); };
+        ws.onmessage = (e) => { try { const msg=JSON.parse(e.data); addLog(`📩 ${msg.type}`,'event'); if(msg.type==='joined'){ document.getElementById('myPlayerId').innerText=msg.playerId; document.getElementById('myTeam').innerText=msg.team===0?'🔵 Команда A':'🔴 Команда B'; } } catch(err){} };
+        ws.onclose = () => { connected=false; document.getElementById('connStatus').innerHTML='Отключен'; document.getElementById('connStatus').className='status-badge status-offline'; addLog('🔌 Отключен','warn'); enableBtns(false); resetUI(); };
+    }
+    function disconnect() { if(ws){ sendMessage('leave',{}); ws.close(); } enableBtns(false); resetUI(); }
+    function resetUI() { document.getElementById('myPlayerId').innerText='—'; document.getElementById('myTeam').innerText='—'; }
+    function enableBtns(en) { ['shootBtn','pingBtn','leaveBtn'].forEach(id=>document.getElementById(id).disabled=!en); document.getElementById('connectBtn').disabled=en; document.getElementById('disconnectBtn').disabled=!en; }
+    document.getElementById('connectBtn').onclick = connect;
+    document.getElementById('disconnectBtn').onclick = disconnect;
+    document.getElementById('shootBtn').onclick = () => sendMessage('shoot',{position:{x:500,y:500},angle:0,weaponSlot:0});
+    document.getElementById('pingBtn').onclick = () => sendMessage('ping',{timestamp:Date.now()});
+    document.getElementById('leaveBtn').onclick = () => { sendMessage('leave',{}); setTimeout(()=>{ resetUI(); enableBtns(false); },500); };
+    enableBtns(false);
+    document.getElementById('playerName').value = 'Tester_'+Math.floor(Math.random()*1000);
+</script>
+</body>
+</html>

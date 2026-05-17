@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grits Game - Админ панель</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        .rooms-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 20px; margin-top: 20px; }
+        .room-card { background: #0b0e17; border-radius: 20px; border: 1px solid #262d3e; overflow: hidden; }
+        .room-header { padding: 15px; background: #0a0e16; border-bottom: 1px solid #1f2538; display: flex; justify-content: space-between; align-items: center; }
+        .room-state { padding: 4px 12px; border-radius: 40px; font-size: 0.7rem; font-weight: bold; }
+        .state-waiting { background: #854d0e; color: #fde047; }
+        .state-playing { background: #166534; color: #86efac; }
+        .room-actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+        .events-panel { background: #0f131e; border-radius: 28px; border: 1px solid #262d3e; display: flex; flex-direction: column; height: 500px; }
+        .events-header { padding: 20px; border-bottom: 1px solid #262d3e; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+        .events-list { flex: 1; overflow-y: auto; padding: 12px; }
+        .event-item { background: #0a0e16; margin-bottom: 8px; padding: 10px 12px; border-radius: 12px; border-left: 3px solid; font-size: 12px; cursor: pointer; }
+        .event-item:hover { background: #151c2a; }
+        .event-critical { border-left-color: #ef4444; }
+        .event-high { border-left-color: #f97316; }
+        .event-info { border-left-color: #3b82f6; }
+        .stats-bar { background: #0a0e16; padding: 12px; border-radius: 16px; margin-top: 12px; display: flex; gap: 16px; flex-wrap: wrap; }
+        .stat-badge { background: #1e2438; padding: 4px 12px; border-radius: 20px; font-size: 11px; }
+        .admin-header { background: linear-gradient(135deg, #0f111f, #0b0d18); padding: 20px 28px; border-radius: 28px; border: 1px solid #232838; margin-bottom: 24px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="admin-header">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+            <div><h1>🎮 Grits Game | Admin Console</h1><p>Мониторинг в реальном времени</p></div>
+            <div><span id="wsStatus">⚫ Подключение...</span></div>
+        </div>
+        <div class="stats-bar">
+            <span class="stat-badge">📊 Событий: <span id="totalEvents">0</span></span>
+            <span class="stat-badge">💀 Убийств: <span id="killsCount">0</span></span>
+            <span class="stat-badge">🏠 Комнат: <span id="roomsCount">0</span></span>
+        </div>
+    </div>
+    <div class="dashboard">
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 16px;">
+                <h2>🏠 Активные комнаты</h2>
+                <div class="flex-row">
+                    <input type="text" id="newRoomId" placeholder="ID комнаты">
+                    <button id="createRoomBtn" class="primary">➕ Создать</button>
+                    <button id="refreshRoomsBtn">🔄 Обновить</button>
+                </div>
+            </div>
+            <div id="roomsGrid" class="rooms-grid"><div style="text-align: center; padding: 40px;">Загрузка...</div></div>
+        </div>
+        <div class="events-panel">
+            <div class="events-header">
+                <h2>📡 Поток событий</h2>
+                <div class="flex-row">
+                    <input type="text" id="roomFilter" placeholder="ID комнаты">
+                    <button id="clearEventsBtn">🗑️ Очистить</button>
+                    <button id="exportEventsBtn">📥 Экспорт</button>
+                </div>
+            </div>
+            <div id="eventsList" class="events-list"><div style="text-align: center; padding: 40px;">Ожидание событий...</div></div>
+        </div>
+    </div>
+</div>
+<script>
+    let eventWs = null, events = [], rooms = [];
+    function initEventStream() {
+        const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        eventWs = new WebSocket(protocol + '//' + location.host + '/events');
+        eventWs.onopen = () => { document.getElementById('wsStatus').innerHTML = '🟢 Стрим активен'; };
+        eventWs.onmessage = (e) => {
+            const data = JSON.parse(e.data);
+            if (data.type === 'server_event') addEvent(data.event);
+            else if (data.type === 'history_events') data.events.forEach(ev => addEvent(ev, true));
+        };
+        eventWs.onclose = () => { document.getElementById('wsStatus').innerHTML = '🔴 Переподключение...'; setTimeout(initEventStream, 3000); };
+    }
+    function addEvent(event, isHistory = false) { events.unshift(event); if (events.length > 500) events.pop(); renderEvents(); updateStats(); }
+    function renderEvents() {
+        const container = document.getElementById('eventsList');
+        const roomFilter = document.getElementById('roomFilter').value.toLowerCase();
+        let filtered = roomFilter ? events.filter(e => (e.roomId || '').toLowerCase().includes(roomFilter)) : events;
+        if (filtered.length === 0) { container.innerHTML = '<div style="text-align: center; padding: 40px;">Нет событий</div>'; return; }
+        container.innerHTML = filtered.slice(0, 200).map(event => {
+            const time = new Date(event.timestamp).toLocaleTimeString();
+            let severityClass = 'event-info';
+            if (event.severity === 'critical') severityClass = 'event-critical';
+            else if (event.severity === 'high') severityClass = 'event-high';
+            let icon = '📌';
+            if (event.type?.includes('kill')) icon = '💀';
+            if (event.type?.includes('joined')) icon = '👤';
+            if (event.type?.includes('room')) icon = '🏠';
+            return `<div class="event-item ${severityClass}" onclick="alert(JSON.stringify(${JSON.stringify(event)}, null, 2))">
+                <div><span class="event-time">${time}</span> <span>${icon} ${event.type}</span></div>
+                <div style="font-size: 11px; color:#9ca3af;">${event.roomId ? '🏠 '+event.roomId : ''} ${event.playerName ? '👤 '+event.playerName : ''}</div>
+            </div>`;
+        }).join('');
+    }
+    function updateStats() { document.getElementById('totalEvents').innerText = events.length; document.getElementById('killsCount').innerText = events.filter(e => e.type === 'player_killed').length; }
+    async function loadRooms() {
+        try { const res = await fetch('/api/admin/rooms'); const data = await res.json(); if(data.success) { rooms = data.rooms; document.getElementById('roomsCount').innerText = rooms.length; renderRooms(); } } catch(e) {}
+    }
+    function renderRooms() {
+        const container = document.getElementById('roomsGrid');
+        if (!rooms.length) { container.innerHTML = '<div style="text-align: center; padding: 40px;">Нет комнат</div>'; return; }
+        container.innerHTML = rooms.map(room => `
+            <div class="room-card"><div class="room-header"><div><strong>🏠 ${room.id}</strong><div style="font-size:11px;">👥 ${room.players}/${room.maxPlayers}</div></div>
+            <div class="room-state state-${room.state}">${room.state === 'playing' ? '🎮 В игре' : '⏳ Ожидание'}</div></div>
+            <div style="padding:15px;"><div class="room-actions">
+                <button onclick="filterByRoom('${room.id}')">📋 События</button>
+                <button onclick="forceEnd('${room.id}')" class="danger">⏹️ Завершить</button>
+                <button onclick="deleteRoom('${room.id}')" class="danger">🗑️ Удалить</button>
+            </div></div></div>
+        `).join('');
+    }
+    function filterByRoom(roomId) { document.getElementById('roomFilter').value = roomId; renderEvents(); }
+    async function forceEnd(roomId) { if(confirm('Завершить игру?')) await fetch(`/api/admin/room/${roomId}/end`, { method: 'POST' }); loadRooms(); }
+    async function deleteRoom(roomId) { if(confirm('Удалить комнату?')) await fetch(`/api/admin/room/${roomId}`, { method: 'DELETE' }); loadRooms(); }
+    async function createRoom() { const roomId = document.getElementById('newRoomId').value.trim(); if(roomId) await fetch('/api/admin/room/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ roomId, maxPlayers: 4 }) }); loadRooms(); document.getElementById('newRoomId').value = ''; }
+    function exportEvents() { window.open('/api/events/export', '_blank'); }
+    document.getElementById('createRoomBtn').onclick = createRoom;
+    document.getElementById('refreshRoomsBtn').onclick = loadRooms;
+    document.getElementById('clearEventsBtn').onclick = () => { events = []; renderEvents(); updateStats(); };
+    document.getElementById('exportEventsBtn').onclick = exportEvents;
+    document.getElementById('roomFilter').oninput = renderEvents;
+    initEventStream(); loadRooms(); setInterval(loadRooms, 5000);
+</script>
+</body>
+</html>
